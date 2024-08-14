@@ -1,0 +1,29 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Raven.Compiler", "Raven.Compiler\Raven.Compiler.csproj", "{86542A48-8C55-453B-BE90-602C5D65B961}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Raven.Tests", "Raven.Tests\Raven.Tests.csproj", "{6C0BB16F-E88D-43C5-A69D-E77A1E2E1BFD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Raven.CodeAnalysis", "Raven.Core\Raven.CodeAnalysis.csproj", "{86EB5E5F-AC83-40FC-8807-A792BF0A8722}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{86542A48-8C55-453B-BE90-602C5D65B961}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86542A48-8C55-453B-BE90-602C5D65B961}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86542A48-8C55-453B-BE90-602C5D65B961}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86542A48-8C55-453B-BE90-602C5D65B961}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C0BB16F-E88D-43C5-A69D-E77A1E2E1BFD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C0BB16F-E88D-43C5-A69D-E77A1E2E1BFD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C0BB16F-E88D-43C5-A69D-E77A1E2E1BFD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C0BB16F-E88D-43C5-A69D-E77A1E2E1BFD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86EB5E5F-AC83-40FC-8807-A792BF0A8722}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86EB5E5F-AC83-40FC-8807-A792BF0A8722}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86EB5E5F-AC83-40FC-8807-A792BF0A8722}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86EB5E5F-AC83-40FC-8807-A792BF0A8722}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
