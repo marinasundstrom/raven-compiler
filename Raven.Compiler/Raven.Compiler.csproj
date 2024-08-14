@@ -6,6 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Raven.Core\Raven.CodeAnalysis.csproj" />
+    <ProjectReference Include="..\Raven.CodeAnalysis\Raven.CodeAnalysis.csproj" />
   </ItemGroup>
 </Project>

@@ -8,6 +8,8 @@ The purpose is to build a modern compiler that provides an API for manipulating 
 
 It is a merger of the projects in the [compiler-projects](https://github.com/marinasundstrom/compiler-projects) repo.
 
+Look at unit tests.
+
 ## Compiler
 
 The Parser and the AST is not yet in sync.

@@ -5,7 +5,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Raven.Compiler", "Raven.Com
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Raven.Tests", "Raven.Tests\Raven.Tests.csproj", "{6C0BB16F-E88D-43C5-A69D-E77A1E2E1BFD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Raven.CodeAnalysis", "Raven.Core\Raven.CodeAnalysis.csproj", "{86EB5E5F-AC83-40FC-8807-A792BF0A8722}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Raven.CodeAnalysis", "Raven.CodeAnalysis\Raven.CodeAnalysis.csproj", "{86EB5E5F-AC83-40FC-8807-A792BF0A8722}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
