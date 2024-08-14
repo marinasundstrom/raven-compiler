@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Raven.Tests;
 
-public class UnitTest2
+public class AstTest
 {
     [Fact]
     public void Test1()
@@ -16,7 +16,6 @@ public class UnitTest2
 
         try
         {
-
             var expr1 = SyntaxFactory.Let(
                 SyntaxFactory.Identifier("x"),
                 SyntaxFactory.IfElseExpression(
