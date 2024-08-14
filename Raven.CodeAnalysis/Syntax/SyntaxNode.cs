@@ -32,7 +32,7 @@ public abstract class SyntaxNode : ISyntaxNode, IHasParent
     {
         if (node is null)
         {
-            node = (TSyntaxNode)Activator.CreateInstance(typeof(TSyntaxNode), new object[] { internalSyntaxNode })!;
+            node = (TSyntaxNode)Activator.CreateInstance(typeof(TSyntaxNode), [internalSyntaxNode])!;
 
             AttachChild(node);
         }

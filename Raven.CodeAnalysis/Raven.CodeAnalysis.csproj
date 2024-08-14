@@ -3,12 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Folder Include="Syntax\" />
-    <Folder Include="Syntax\InternalSyntax\" />
-    <Folder Include="Parser\" />
-    <Folder Include="Parser\Internal\" />
-  </ItemGroup>
 </Project>
