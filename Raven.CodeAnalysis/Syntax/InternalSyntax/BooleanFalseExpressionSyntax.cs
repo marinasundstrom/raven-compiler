@@ -4,7 +4,7 @@ public sealed class BooleanFalseExpressionSyntax : BooleanExpressionSyntax
 {
     public BooleanFalseExpressionSyntax(SyntaxToken falseKeyword)
     {
-        FalseKeyword = AddChild(falseKeyword);
+        FalseKeyword = AddChild(0, falseKeyword);
     }
 
     public override SyntaxKind Kind => SyntaxKind.BooleanFalseExpression;

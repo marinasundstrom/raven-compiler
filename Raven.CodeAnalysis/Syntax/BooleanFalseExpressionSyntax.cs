@@ -6,7 +6,7 @@ public sealed class BooleanFalseExpressionSyntax : BooleanExpressionSyntax
     {
         FalseKeyword = falseKeyword;
 
-        AttachChild(falseKeyword);
+        AttachChild(0, falseKeyword);
 
         _internalNode = new InternalSyntax.BooleanFalseExpressionSyntax(
             falseKeyword.InternalSyntax

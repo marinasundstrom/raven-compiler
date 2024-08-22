@@ -5,7 +5,7 @@ using Raven.CodeAnalysis.Parser.Internal;
 
 using Xunit;
 
-namespace Raven.Tests;
+namespace Raven.CodeAnalysis.Parser.Tests;
 
 public class LexerTest
 {

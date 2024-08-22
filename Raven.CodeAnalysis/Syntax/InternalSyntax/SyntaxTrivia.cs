@@ -15,7 +15,7 @@ public struct SyntaxTrivia
 
     public int Width => Token.Width;
 
-    public string Text => Token.Text;
+    public string Text => Token.Text!;
 
     public override string ToString()
     {

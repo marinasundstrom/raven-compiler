@@ -6,7 +6,7 @@ public sealed class NumberExpressionSyntax : ExpressionSyntax
     {
         Token = token;
 
-        AttachChild(token);
+        AttachChild(0, token);
 
         _internalNode = new InternalSyntax.NumberExpressionSyntax(
             token.InternalSyntax

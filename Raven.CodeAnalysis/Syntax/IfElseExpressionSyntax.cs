@@ -2,29 +2,36 @@ namespace Raven.CodeAnalysis.Syntax;
 
 public sealed class IfElseExpressionSyntax : ExpressionSyntax
 {
+    private SyntaxToken _ifKeyword;
+    private ExpressionSyntax? _conditionalExpression;
+    private SyntaxToken _thenKeyword;
+    private ExpressionSyntax? _thenExpression;
+    private SyntaxToken? _elseKeyword;
+    private ExpressionSyntax? _elseExpression;
+
     public IfElseExpressionSyntax(
         SyntaxToken ifKeyword, ExpressionSyntax conditionalExpression, SyntaxToken thenKeyword,
         ExpressionSyntax thenExpression, SyntaxToken? elseKeyword = null, ExpressionSyntax? elseExpression = null)
     {
-        IfKeyword = ifKeyword;
-        ConditionalExpression = conditionalExpression;
-        ThenKeyword = thenKeyword;
-        ThenExpression = thenExpression;
-        ElseKeyword = elseKeyword;
-        ElseExpression = elseExpression;
+        _ifKeyword = ifKeyword;
+        _conditionalExpression = conditionalExpression;
+        _thenKeyword = thenKeyword;
+        _thenExpression = thenExpression;
+        _elseKeyword = elseKeyword;
+        _elseExpression = elseExpression;
 
-        AttachChild(ifKeyword);
-        AttachChild(conditionalExpression);
-        AttachChild(thenKeyword);
+        AttachChild(0, ifKeyword);
+        AttachChild(1, conditionalExpression);
+        AttachChild(2, thenKeyword);
 
         if (elseKeyword is not null)
         {
-            AttachChild(elseKeyword);
+            AttachChild(3, elseKeyword);
         }
 
         if (elseExpression is not null)
         {
-            AttachChild(elseExpression);
+            AttachChild(4, elseExpression);
         }
 
         _internalNode = new InternalSyntax.IfElseExpressionSyntax(
@@ -37,17 +44,17 @@ public sealed class IfElseExpressionSyntax : ExpressionSyntax
         );
     }
 
-    public SyntaxToken IfKeyword { get; }
+    public SyntaxToken IfKeyword => GetOrCreateNode(0, InternalSyntax.IfKeyword, ref _ifKeyword)!;
 
-    public ExpressionSyntax ConditionalExpression { get; }
+    public ExpressionSyntax ConditionalExpression => GetOrCreateNode(0, InternalSyntax.ConditionalExpression, ref _conditionalExpression)!;
 
-    public SyntaxToken ThenKeyword { get; }
+    public SyntaxToken ThenKeyword => GetOrCreateNode(0, InternalSyntax.ThenKeyword, ref _thenKeyword)!;
 
-    public ExpressionSyntax ThenExpression { get; }
+    public ExpressionSyntax ThenExpression => GetOrCreateNode(0, InternalSyntax.ThenExpression, ref _thenExpression)!;
 
-    public SyntaxToken? ElseKeyword { get; }
+    public SyntaxToken? ElseKeyword => GetOrCreateNode(0, InternalSyntax.ElseKeyword, ref _elseKeyword)!;
 
-    public ExpressionSyntax? ElseExpression { get; }
+    public ExpressionSyntax? ElseExpression => GetOrCreateNode(0, InternalSyntax.ElseExpression, ref _elseExpression)!;
 
     internal IfElseExpressionSyntax(InternalSyntax.IfElseExpressionSyntax internalSyntax)
     {

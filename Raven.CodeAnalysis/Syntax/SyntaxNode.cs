@@ -6,8 +6,8 @@ namespace Raven.CodeAnalysis.Syntax;
 
 public abstract class SyntaxNode : ISyntaxNode, IHasParent
 {
-    internal InternalSyntax.SyntaxNode _internalNode;
-    readonly List<ISyntaxNode> _children = new List<ISyntaxNode>();
+    internal InternalSyntax.SyntaxNode _internalNode = default!;
+    readonly Dictionary<int, ISyntaxNode> _children = new Dictionary<int, ISyntaxNode>();
 
     public virtual SyntaxKind Kind => _internalNode.Kind;
 
@@ -15,26 +15,30 @@ public abstract class SyntaxNode : ISyntaxNode, IHasParent
 
     public TextSpan FullSpan => new TextSpan(Parent?.FullSpan?.End ?? 0, _internalNode.FullWidth);
 
-    public virtual SyntaxNode? Parent { get; private set; } = null!;
+    public virtual SyntaxNode? Parent { get; private set; }
 
-    IReadOnlyList<SyntaxNode> ChildNodes => _children.OfType<SyntaxNode>().ToList();
+    IReadOnlyList<SyntaxNode> ChildNodes => _children
+        .OrderBy(x => x.Key)
+        .Select(x => x.Value)
+        .OfType<SyntaxNode>()
+        .ToList();
 
-    protected void AttachChild(ISyntaxNode childSyntax)
+    protected void AttachChild(int index, ISyntaxNode childSyntax)
     {
         ((IHasParent)childSyntax).SetParent(this);
-        _children.Add(childSyntax);
+        _children.Add(index, childSyntax);
     }
 
     void IHasParent.SetParent(SyntaxNode parent) => Parent = parent;
 
-    public TSyntaxNode GetOrCreateNode<TSyntaxNode>(InternalSyntax.SyntaxNode internalSyntaxNode, ref TSyntaxNode node)
-        where TSyntaxNode : ISyntaxNode
+    public TSyntaxNode GetOrCreateNode<TSyntaxNode>(int index, InternalSyntax.SyntaxNode internalSyntaxNode, ref TSyntaxNode node)
+        where TSyntaxNode : ISyntaxNode?
     {
         if (node is null)
         {
             node = (TSyntaxNode)Activator.CreateInstance(typeof(TSyntaxNode), [internalSyntaxNode])!;
 
-            AttachChild(node);
+            AttachChild(index, node);
         }
 
         return node!;

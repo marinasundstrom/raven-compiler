@@ -5,9 +5,9 @@ public sealed class AssignmentExpressionSyntax : ExpressionSyntax
     public AssignmentExpressionSyntax(
         ExpressionSyntax targetExpression, SyntaxToken assignmentToken, ExpressionSyntax assignmentExpression)
     {
-        TargetExpression = AddChild(targetExpression);
-        AssignmentToken = AddChild(assignmentToken);
-        AssignmentExpression = AddChild(assignmentExpression);
+        TargetExpression = AddChild(0, targetExpression);
+        AssignmentToken = AddChild(1, assignmentToken);
+        AssignmentExpression = AddChild(2, assignmentExpression);
     }
 
     public override SyntaxKind Kind => SyntaxKind.AssingmentExpression;

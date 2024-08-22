@@ -4,7 +4,7 @@ public sealed class NumberExpressionSyntax : ExpressionSyntax
 {
     public NumberExpressionSyntax(SyntaxToken token)
     {
-        Token = AddChild(token);
+        Token = AddChild(0, token);
     }
 
     public override SyntaxKind Kind => SyntaxKind.NumberExpression;

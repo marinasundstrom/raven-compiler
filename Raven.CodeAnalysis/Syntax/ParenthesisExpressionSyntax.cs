@@ -9,9 +9,9 @@ public sealed class ParenthesisExpressionSyntax : ExpressionSyntax
         Expression = expression;
         ClosingParenToken = closingParenToken;
 
-        AttachChild(openingParenToken);
-        AttachChild(expression);
-        AttachChild(closingParenToken);
+        AttachChild(0, openingParenToken);
+        AttachChild(1, expression);
+        AttachChild(2, closingParenToken);
 
         _internalNode = new InternalSyntax.ParenthesisExpressionSyntax(
           openingParenToken.InternalSyntax,

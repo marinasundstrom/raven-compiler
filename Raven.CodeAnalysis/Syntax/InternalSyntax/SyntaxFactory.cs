@@ -20,15 +20,11 @@ public static partial class SyntaxFactory
 
     public static readonly SyntaxToken FalseToken = new SyntaxToken(SyntaxKind.FalseToken, "false");
 
-
-    //public static readonly SyntaxToken ThenKeyword = new SyntaxToken(SyntaxKind.OpeningParenToken, "then");
-
     public static readonly SyntaxToken GreaterThanToken = new SyntaxToken(SyntaxKind.CloseAngleToken, ">");
 
     public static readonly SyntaxToken OpeningParenToken = new SyntaxToken(SyntaxKind.OpeningParenToken, "(");
 
     public static readonly SyntaxToken ClosingParenToken = new SyntaxToken(SyntaxKind.ClosingParenToken, ")");
-
 
     public static SyntaxToken Identifier(SyntaxTriviaList leadingTrivia, SyntaxKind contextualKind, string text, SyntaxTriviaList trailingTrivia)
     {

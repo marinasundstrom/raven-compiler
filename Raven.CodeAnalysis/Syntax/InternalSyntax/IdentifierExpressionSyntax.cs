@@ -4,7 +4,7 @@ public sealed class IdentifierExpressionSyntax : ExpressionSyntax
 {
     public IdentifierExpressionSyntax(SyntaxToken token)
     {
-        Token = AddChild(token);
+        Token = AddChild(0, token);
     }
 
     public override SyntaxKind Kind => SyntaxKind.IdentifierExpression;

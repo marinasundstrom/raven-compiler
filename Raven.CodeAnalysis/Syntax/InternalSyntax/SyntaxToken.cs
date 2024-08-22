@@ -11,7 +11,7 @@ namespace Raven.CodeAnalysis.Syntax.InternalSyntax
     public class SyntaxToken : SyntaxNode
     {
         public SyntaxToken(SyntaxKind kind, string? text = null)
-            : this(new SyntaxTriviaList(), kind, text, new SyntaxTriviaList())
+            : this(new SyntaxTriviaList(), kind, text!, new SyntaxTriviaList())
         {
 
         }
@@ -63,7 +63,7 @@ namespace Raven.CodeAnalysis.Syntax.InternalSyntax
 
         public override string ToString()
         {
-            return Text;
+            return Text ?? string.Empty;
         }
 
         public SyntaxToken PrependLeadingTrivia(params SyntaxTrivia[] syntaxTrivia)

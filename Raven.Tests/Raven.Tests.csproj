@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>Nullable</WarningsAsErrors>
 
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -18,5 +20,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Raven.CodeAnalysis\Raven.CodeAnalysis.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="CodeAnalysis/Syntax/InternalSyntax/" />
   </ItemGroup>
 </Project>

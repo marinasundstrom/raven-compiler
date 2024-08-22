@@ -6,7 +6,7 @@ public sealed class BooleanTrueExpressionSyntax : BooleanExpressionSyntax
     {
         TrueKeyword = trueKeyword;
 
-        AttachChild(trueKeyword);
+        AttachChild(0, trueKeyword);
 
         _internalNode = new InternalSyntax.BooleanTrueExpressionSyntax(
             trueKeyword.InternalSyntax

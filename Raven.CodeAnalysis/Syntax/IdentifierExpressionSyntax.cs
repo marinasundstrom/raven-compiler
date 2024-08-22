@@ -8,7 +8,7 @@ public sealed class IdentifierExpressionSyntax : ExpressionSyntax
     {
         Token = token;
 
-        AttachChild(token);
+        AttachChild(0, token);
 
         _internalNode = new InternalSyntax.IdentifierExpressionSyntax(
             token.InternalSyntax

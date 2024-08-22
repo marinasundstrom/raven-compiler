@@ -6,19 +6,19 @@ public sealed class IfElseExpressionSyntax : ExpressionSyntax
         SyntaxToken ifKeyword, ExpressionSyntax conditionalExpression, SyntaxToken
         thenKeyword, ExpressionSyntax thenExpression, SyntaxToken? elseKeyword = null, ExpressionSyntax? elseExpression = null)
     {
-        IfKeyword = AddChild(ifKeyword);
-        ConditionalExpression = AddChild(conditionalExpression);
-        ThenKeyword = AddChild(thenKeyword);
-        ThenExpression = AddChild(thenExpression);
+        IfKeyword = AddChild(0, ifKeyword);
+        ConditionalExpression = AddChild(1, conditionalExpression);
+        ThenKeyword = AddChild(2, thenKeyword);
+        ThenExpression = AddChild(3, thenExpression);
 
         if (elseKeyword is not null)
         {
-            ElseKeyword = AddChild(elseKeyword!);
+            ElseKeyword = AddChild(4, elseKeyword!);
         }
 
         if (elseExpression is not null)
         {
-            ElseExpression = AddChild(elseExpression!);
+            ElseExpression = AddChild(5, elseExpression!);
         }
     }
 

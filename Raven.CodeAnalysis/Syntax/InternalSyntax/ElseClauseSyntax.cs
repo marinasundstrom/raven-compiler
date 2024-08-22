@@ -4,8 +4,8 @@ public class ElseClauseSyntax : SyntaxNodeWithChildren
 {
     public ElseClauseSyntax(SyntaxToken elseToken, StatementSyntax? parseStatement)
     {
-        this.ElseToken = AddChild(elseToken);
-        this.ParseStatement = AddChild(parseStatement!);
+        this.ElseToken = AddChild(0, elseToken);
+        this.ParseStatement = AddChild(1, parseStatement!);
     }
 
     public override SyntaxKind Kind => SyntaxKind.ElseClauseSyntax;
@@ -13,9 +13,4 @@ public class ElseClauseSyntax : SyntaxNodeWithChildren
     public SyntaxToken ElseToken { get; }
 
     public StatementSyntax? ParseStatement { get; }
-
-    public override string ToFullString()
-    {
-        throw new System.NotImplementedException();
-    }
 }

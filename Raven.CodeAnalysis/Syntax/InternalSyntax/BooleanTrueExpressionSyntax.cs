@@ -4,7 +4,7 @@ public sealed class BooleanTrueExpressionSyntax : BooleanExpressionSyntax
 {
     public BooleanTrueExpressionSyntax(SyntaxToken trueKeyword)
     {
-        TrueKeyword = AddChild(trueKeyword);
+        TrueKeyword = AddChild(0, trueKeyword);
     }
 
     public override SyntaxKind Kind => SyntaxKind.BooleanTrueExpression;

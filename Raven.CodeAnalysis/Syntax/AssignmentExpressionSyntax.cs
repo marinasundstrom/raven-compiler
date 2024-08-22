@@ -2,16 +2,20 @@ namespace Raven.CodeAnalysis.Syntax;
 
 public sealed class AssignmentExpressionSyntax : ExpressionSyntax
 {
+    private ExpressionSyntax? _targetExpression;
+    private SyntaxToken _assignmentToken;
+    private ExpressionSyntax? _assignmentExpression;
+
     public AssignmentExpressionSyntax(
         ExpressionSyntax targetExpression, SyntaxToken assignmentToken, ExpressionSyntax assignmentExpression)
     {
-        TargetExpression = targetExpression;
-        AssignmentToken = assignmentToken;
-        AssignmentExpression = assignmentExpression;
+        _targetExpression = targetExpression;
+        _assignmentToken = assignmentToken;
+        _assignmentExpression = assignmentExpression;
 
-        AttachChild(targetExpression);
-        AttachChild(assignmentToken);
-        AttachChild(assignmentExpression);
+        AttachChild(0, targetExpression);
+        AttachChild(1, assignmentToken);
+        AttachChild(2, assignmentExpression);
 
         _internalNode = new InternalSyntax.AssignmentExpressionSyntax(
             targetExpression.InternalSyntax,
@@ -20,14 +24,14 @@ public sealed class AssignmentExpressionSyntax : ExpressionSyntax
         );
     }
 
-    public ExpressionSyntax TargetExpression { get; }
-    public SyntaxToken AssignmentToken { get; }
-    public ExpressionSyntax AssignmentExpression { get; }
+    public ExpressionSyntax TargetExpression => GetOrCreateNode(0, InternalSyntax.TargetExpression, ref _targetExpression)!;
+    public SyntaxToken AssignmentToken => GetOrCreateNode(1, InternalSyntax.AssignmentToken, ref _assignmentToken)!;
+    public ExpressionSyntax AssignmentExpression => GetOrCreateNode(2, InternalSyntax.AssignmentExpression, ref _assignmentExpression)!;
 
     internal AssignmentExpressionSyntax(InternalSyntax.AssignmentExpressionSyntax internalSyntax)
     {
         _internalNode = internalSyntax;
     }
 
-    internal InternalSyntax.AssignmentExpressionSyntax Syntax => (InternalSyntax.AssignmentExpressionSyntax)_internalNode;
+    new internal InternalSyntax.AssignmentExpressionSyntax InternalSyntax => (InternalSyntax.AssignmentExpressionSyntax)_internalNode;
 }

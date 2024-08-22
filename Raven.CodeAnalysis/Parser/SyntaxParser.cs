@@ -60,7 +60,7 @@ public class SyntaxParser
                 elseClauseSyntax = ParseElseClauseSyntax();
             }
 
-            return new IfElseStatementSyntax(ifToken, condition, thenToken, statement, null, null);
+            return new IfElseStatementSyntax(ifToken, condition!, thenToken!, statement!, null, null);
         }
 
         return null;

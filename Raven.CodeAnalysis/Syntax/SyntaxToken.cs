@@ -42,7 +42,7 @@ public struct SyntaxToken : ISyntaxNode, IHasParent
 
     public override string ToString()
     {
-        return SyntaxFacts.GetSyntaxTokenText(Kind);
+        return SyntaxFacts.GetSyntaxTokenText(Kind)!;
     }
 
     void IHasParent.SetParent(SyntaxNode parent) => Parent = parent;

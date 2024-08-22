@@ -5,7 +5,7 @@ using Raven.CodeAnalysis.Syntax;
 
 using Xunit;
 
-namespace Raven.Tests;
+namespace Raven.CodeAnalysis.Syntax.Tests;
 
 public class AstTest
 {

@@ -5,7 +5,7 @@ using Raven.CodeAnalysis.Parser.Internal;
 
 using Xunit;
 
-namespace Raven.Tests;
+namespace Raven.CodeAnalysis.Parser.Tests;
 
 public class ParserTest
 {
@@ -25,7 +25,7 @@ public class ParserTest
             SyntaxParser parser = new SyntaxParser(tokenizer);
             var block = parser.ParseStatement();
 
-            var str = block.ToFullString();
+            var str = block!.ToFullString();
         }
     }
 

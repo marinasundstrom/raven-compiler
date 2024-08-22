@@ -23,18 +23,25 @@ public abstract class SyntaxNode
 
 public abstract class SyntaxNodeWithChildren : SyntaxNode
 {
-    readonly List<SyntaxNode> _children = new List<SyntaxNode>();
+    readonly Dictionary<int, SyntaxNode> _children = new Dictionary<int, SyntaxNode>();
 
-    public override int Width => _children.Sum(x => x.Width);
+    public override int Width => _children
+        .Select(x => x.Value)
+        .Sum(x => x.Width);
 
-    public override int FullWidth => _children.Sum(x => x.FullWidth);
+    public override int FullWidth => _children
+        .Select(x => x.Value)
+        .Sum(x => x.FullWidth);
 
-    public override string ToFullString() => string.Join(string.Empty, _children.Select(x => x.ToFullString()));
+    public override string ToFullString() => string.Join(string.Empty, _children
+        .OrderBy(x => x.Key)
+        .Select(x => x.Value)
+        .Select(x => x.ToFullString()));
 
-    protected T AddChild<T>(T node)
+    protected T AddChild<T>(int index, T node)
         where T : SyntaxNode
     {
-        _children.Add(node);
+        _children.Add(index, node);
         return node;
     }
 }
