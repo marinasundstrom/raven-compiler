@@ -1575,14 +1575,15 @@ internal sealed class WorkspaceManager
     {
         try
         {
-            diagnostics = _workspace.GetDocumentAnalyzerDiagnostics(
+            var result = _workspace.GetDocumentAnalyzerResult(
                 document,
                 compilation,
                 analyzerOptions,
                 allowBusySkip,
                 semanticAccessAlreadyHeld,
                 cancellationToken);
-            return true;
+            diagnostics = result.Diagnostics;
+            return result.Succeeded;
         }
         catch (ArgumentException)
         {
@@ -1643,8 +1644,9 @@ internal sealed class WorkspaceManager
     {
         try
         {
-            diagnostics = _workspace.GetProjectAnalyzerDiagnostics(projectId, compilation, analyzerOptions, cancellationToken);
-            return true;
+            var result = _workspace.GetProjectAnalyzerResult(projectId, compilation, analyzerOptions, cancellationToken);
+            diagnostics = result.Diagnostics;
+            return result.Succeeded;
         }
         catch (ArgumentException)
         {
@@ -1710,8 +1712,9 @@ internal sealed class WorkspaceManager
     {
         try
         {
-            diagnostics = _workspace.GetDocumentAnalyzerDiagnostics(projectId, documentId, analyzerOptions, cancellationToken);
-            return true;
+            var result = _workspace.GetDocumentAnalyzerResult(projectId, documentId, analyzerOptions, cancellationToken);
+            diagnostics = result.Diagnostics;
+            return result.Succeeded;
         }
         catch (ArgumentException)
         {

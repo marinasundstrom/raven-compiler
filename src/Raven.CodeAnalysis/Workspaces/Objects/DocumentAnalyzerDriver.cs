@@ -68,6 +68,19 @@ internal sealed class DocumentAnalyzerDriver
         bool allowBusySkip = false,
         bool semanticAccessAlreadyHeld = false,
         bool includeCompilationActions = false)
+        => RunWithResult(project, syntaxTree, compilation, analyzerOptions, eventSink, cancellationToken,
+            allowBusySkip, semanticAccessAlreadyHeld, includeCompilationActions).Diagnostics;
+
+    public static AnalyzerDiagnosticsResult RunWithResult(
+        Project project,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        CompilationWithAnalyzersOptions? analyzerOptions,
+        IWorkspaceEventSink? eventSink,
+        CancellationToken cancellationToken,
+        bool allowBusySkip = false,
+        bool semanticAccessAlreadyHeld = false,
+        bool includeCompilationActions = false)
     {
         var driver = new DocumentAnalyzerDriver(
             project,
@@ -83,7 +96,7 @@ internal sealed class DocumentAnalyzerDriver
         return driver.RunCore();
     }
 
-    private ImmutableArray<Diagnostic> RunCore()
+    private AnalyzerDiagnosticsResult RunCore()
     {
         var totalTimestamp = Stopwatch.GetTimestamp();
 
@@ -104,7 +117,9 @@ internal sealed class DocumentAnalyzerDriver
                 Stopwatch.GetElapsedTime(totalTimestamp).TotalMilliseconds,
                 $"analyzers={executions.Count}, diagnostics={_diagnostics.Count}, failures={failureCount}, outcome={(failureCount == 0 ? "completed" : "completedWithFailures")}");
 
-            return _diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray();
+            return new AnalyzerDiagnosticsResult(
+                _diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray(),
+                Succeeded: failureCount == 0);
         }
         catch (OperationCanceledException)
         {
@@ -150,7 +165,7 @@ internal sealed class DocumentAnalyzerDriver
             AnalyzerDiagnosticIdValidator.Validate(analyzer, diagnostic, isInternalAnalyzer);
 
             var mapped = _compilation.ApplyCompilationOptions(
-                diagnostic,
+                AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, analyzer),
                 _analyzerOptions?.ReportSuppressedDiagnostics ?? false);
             if (mapped is not null)
             {
@@ -894,3 +909,5 @@ internal sealed class DocumentAnalyzerDriver
             OperationActionTicks);
     }
 }
+
+internal readonly record struct AnalyzerDiagnosticsResult(ImmutableArray<Diagnostic> Diagnostics, bool Succeeded);

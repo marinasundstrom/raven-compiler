@@ -253,7 +253,8 @@ public abstract class DiagnosticAnalyzer
             }
         }
 
-        return diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance);
+        return diagnostics.Select(diagnostic => AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, this))
+            .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance);
 
         ImmutableHashSet<SymbolKind> GetRegisteredSymbolKinds()
             => _symbolActions

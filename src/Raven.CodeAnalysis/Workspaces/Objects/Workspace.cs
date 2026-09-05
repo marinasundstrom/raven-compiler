@@ -546,10 +546,17 @@ public class Workspace
             ?? throw new ArgumentException("Project not found", nameof(projectId));
 
         var compilation = CreateAnalysisCompilation(project, new HashSet<ProjectId>());
-        return GetProjectAnalyzerDiagnostics(project, compilation, analyzerOptions, cancellationToken);
+        return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken).Diagnostics;
     }
 
     internal ImmutableArray<Diagnostic> GetProjectAnalyzerDiagnostics(
+        ProjectId projectId,
+        Compilation compilation,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        CancellationToken cancellationToken = default)
+        => GetProjectAnalyzerResult(projectId, compilation, analyzerOptions, cancellationToken).Diagnostics;
+
+    internal AnalyzerDiagnosticsResult GetProjectAnalyzerResult(
         ProjectId projectId,
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
@@ -561,10 +568,10 @@ public class Workspace
         var project = solution.GetProject(projectId)
             ?? throw new ArgumentException("Project not found", nameof(projectId));
 
-        return GetProjectAnalyzerDiagnostics(project, compilation, analyzerOptions, cancellationToken);
+        return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken);
     }
 
-    private ImmutableArray<Diagnostic> GetProjectAnalyzerDiagnostics(
+    private AnalyzerDiagnosticsResult GetProjectAnalyzerResult(
         Project project,
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions,
@@ -583,7 +590,7 @@ public class Workspace
                 project.FilePath,
                 0,
                 $"diagnostics={cachedDiagnostics.Length}"));
-            return cachedDiagnostics;
+            return new(cachedDiagnostics, Succeeded: true);
         }
 
         var timestamp = Stopwatch.GetTimestamp();
@@ -595,6 +602,7 @@ public class Workspace
             $"projectVersion={project.Version}"));
 
         var diagnostics = new HashSet<Diagnostic>();
+        var succeeded = true;
         AddDiagnostics(
             diagnostics,
             compilation.GetDiagnostics(analyzerOptions, cancellationToken),
@@ -602,7 +610,7 @@ public class Workspace
 
         if (project.CompilationOptions?.RunAnalyzers != false)
         {
-            RunProjectCompilationAnalyzerActions(
+            succeeded = RunProjectCompilationAnalyzerActions(
                 project,
                 compilation,
                 diagnostics,
@@ -612,22 +620,19 @@ public class Workspace
             foreach (var document in project.Documents.OrderBy(static document => document.FilePath, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                AddDiagnostics(
-                    diagnostics,
-                    GetDocumentAnalyzerDiagnostics(
-                        document,
-                        compilation,
-                        analyzerOptions,
-                        allowBusySkip: false,
-                        semanticAccessAlreadyHeld: false,
-                        cancellationToken),
-                    cancellationToken);
+                var documentResult = GetDocumentAnalyzerResult(document, compilation, analyzerOptions,
+                    allowBusySkip: false, semanticAccessAlreadyHeld: false, cancellationToken);
+                succeeded &= documentResult.Succeeded;
+                AddDiagnostics(diagnostics, documentResult.Diagnostics, cancellationToken);
             }
         }
 
         var result = diagnostics
             .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance)
             .ToImmutableArray();
+        if (!succeeded)
+            return new(result, Succeeded: false);
+
         _projectAnalyzerDiagnosticsCache[cacheKey] = result;
 
         Services.WorkspaceEventSink?.Report(new WorkspaceEvent(
@@ -637,16 +642,17 @@ public class Workspace
             Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds,
             $"diagnostics={result.Length}"));
 
-        return result;
+        return new(result, Succeeded: true);
     }
 
-    private void RunProjectCompilationAnalyzerActions(
+    private bool RunProjectCompilationAnalyzerActions(
         Project project,
         Compilation compilation,
         HashSet<Diagnostic> diagnostics,
         CompilationWithAnalyzersOptions? analyzerOptions,
         CancellationToken cancellationToken)
     {
+        var succeeded = true;
         foreach (var reference in project.AnalyzerReferences)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -655,12 +661,18 @@ public class Workspace
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!ShouldRunAnalyzer(analyzer, project.CompilationOptions, analyzerOptions) ||
-                    !analyzer.TryEnsureInitialized() ||
-                    analyzer.CompilationActions.Count == 0)
+                if (!ShouldRunAnalyzer(analyzer, project.CompilationOptions, analyzerOptions))
                 {
                     continue;
                 }
+
+                if (!analyzer.TryEnsureInitialized())
+                {
+                    succeeded = false;
+                    continue;
+                }
+                if (analyzer.CompilationActions.Count == 0)
+                    continue;
 
                 var analyzerTimestamp = Stopwatch.GetTimestamp();
                 var analyzerName = analyzer.GetType().FullName ?? analyzer.GetType().Name;
@@ -672,7 +684,7 @@ public class Workspace
                     AnalyzerDiagnosticIdValidator.Validate(analyzer, diagnostic, isInternalAnalyzer);
 
                     var mapped = compilation.ApplyCompilationOptions(
-                        diagnostic,
+                        AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, analyzer),
                         analyzerOptions?.ReportSuppressedDiagnostics ?? false,
                         cancellationToken);
                     if (mapped is not null)
@@ -711,6 +723,7 @@ public class Workspace
                 }
                 catch (Exception ex)
                 {
+                    succeeded = false;
                     Services.WorkspaceEventSink?.Report(new WorkspaceEvent(
                         "projectAnalyzer.compilationAction",
                         project.Name,
@@ -720,6 +733,7 @@ public class Workspace
                 }
             }
         }
+        return succeeded;
     }
 
     private static void AddDiagnostics(
@@ -823,6 +837,13 @@ public class Workspace
         DocumentId documentId,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
         CancellationToken cancellationToken = default)
+        => GetDocumentAnalyzerResult(projectId, documentId, analyzerOptions, cancellationToken).Diagnostics;
+
+    internal AnalyzerDiagnosticsResult GetDocumentAnalyzerResult(
+        ProjectId projectId,
+        DocumentId documentId,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        CancellationToken cancellationToken = default)
     {
         var solution = CurrentSolution;
         var project = solution.GetProject(projectId)
@@ -835,7 +856,7 @@ public class Workspace
             ?? throw new InvalidOperationException("Document does not have a syntax tree.");
 
         if (project.CompilationOptions?.RunAnalyzers == false)
-            return [];
+            return new([], Succeeded: true);
 
         var compilation = CreateAnalysisCompilation(project, new HashSet<ProjectId>());
         var cacheKey = new DocumentAnalyzerDiagnosticsCacheKey(
@@ -853,7 +874,7 @@ public class Workspace
                 syntaxTree,
                 elapsedMilliseconds: 0,
                 $"diagnostics={cachedDiagnostics.Length}");
-            return cachedDiagnostics;
+            return new(cachedDiagnostics, Succeeded: true);
         }
 
         var cacheMissTimestamp = Stopwatch.GetTimestamp();
@@ -865,10 +886,10 @@ public class Workspace
             $"projectVersion={project.Version}, documentVersion={document.Version}, allowBusySkip=false");
 
         var compilationSyntaxTrees = GetCompilationSyntaxTrees(document, compilation);
-        ImmutableArray<Diagnostic> diagnostics;
+        AnalyzerDiagnosticsResult result;
         try
         {
-            diagnostics = GetDocumentAnalyzerDiagnostics(
+            result = GetDocumentAnalyzerResult(
                 project,
                 compilationSyntaxTrees,
                 compilation,
@@ -898,6 +919,10 @@ public class Workspace
             throw;
         }
 
+        if (!result.Succeeded)
+            return result;
+
+        var diagnostics = result.Diagnostics;
         _documentAnalyzerDiagnosticsCache[cacheKey] = diagnostics;
         ReportWorkspaceEvent(
             "documentAnalyzer.cacheStore",
@@ -905,10 +930,19 @@ public class Workspace
             syntaxTree,
             Stopwatch.GetElapsedTime(cacheMissTimestamp).TotalMilliseconds,
             $"diagnostics={diagnostics.Length}, allowBusySkip=false");
-        return diagnostics;
+        return result;
     }
 
     internal ImmutableArray<Diagnostic> GetDocumentAnalyzerDiagnostics(
+        Document document,
+        Compilation compilation,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        bool allowBusySkip = false,
+        bool semanticAccessAlreadyHeld = false,
+        CancellationToken cancellationToken = default)
+        => GetDocumentAnalyzerResult(document, compilation, analyzerOptions, allowBusySkip, semanticAccessAlreadyHeld, cancellationToken).Diagnostics;
+
+    internal AnalyzerDiagnosticsResult GetDocumentAnalyzerResult(
         Document document,
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
@@ -926,7 +960,7 @@ public class Workspace
         var compilationSyntaxTree = compilationSyntaxTrees[0];
 
         if (document.Project.CompilationOptions?.RunAnalyzers == false)
-            return [];
+            return new([], Succeeded: true);
 
         var cacheKey = new DocumentAnalyzerDiagnosticsCacheKey(
             document.Project.Id,
@@ -943,7 +977,7 @@ public class Workspace
                 compilationSyntaxTree,
                 elapsedMilliseconds: 0,
                 $"diagnostics={cachedDiagnostics.Length}");
-            return cachedDiagnostics;
+            return new(cachedDiagnostics, Succeeded: true);
         }
 
         var cacheMissTimestamp = Stopwatch.GetTimestamp();
@@ -954,10 +988,10 @@ public class Workspace
             elapsedMilliseconds: 0,
             $"projectVersion={document.Project.Version}, documentVersion={document.Version}, allowBusySkip={allowBusySkip}");
 
-        ImmutableArray<Diagnostic> diagnostics;
+        AnalyzerDiagnosticsResult result;
         try
         {
-            diagnostics = GetDocumentAnalyzerDiagnostics(
+            result = GetDocumentAnalyzerResult(
                 document.Project,
                 compilationSyntaxTrees,
                 compilation,
@@ -987,6 +1021,10 @@ public class Workspace
             throw;
         }
 
+        if (!result.Succeeded)
+            return result;
+
+        var diagnostics = result.Diagnostics;
         _documentAnalyzerDiagnosticsCache[cacheKey] = diagnostics;
         ReportWorkspaceEvent(
             "documentAnalyzer.cacheStore",
@@ -994,10 +1032,10 @@ public class Workspace
             compilationSyntaxTree,
             Stopwatch.GetElapsedTime(cacheMissTimestamp).TotalMilliseconds,
             $"diagnostics={diagnostics.Length}, allowBusySkip={allowBusySkip}");
-        return diagnostics;
+        return result;
     }
 
-    private ImmutableArray<Diagnostic> GetDocumentAnalyzerDiagnostics(
+    private AnalyzerDiagnosticsResult GetDocumentAnalyzerResult(
         Project project,
         ImmutableArray<SyntaxTree> syntaxTrees,
         Compilation compilation,
@@ -1007,26 +1045,19 @@ public class Workspace
         CancellationToken cancellationToken)
     {
         var diagnostics = new HashSet<Diagnostic>();
+        var succeeded = true;
         foreach (var syntaxTree in syntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            AddDiagnostics(
-                diagnostics,
-                DocumentAnalyzerDriver.Run(
-                    project,
-                    syntaxTree,
-                    compilation,
-                    analyzerOptions,
-                    Services.WorkspaceEventSink,
-                    cancellationToken,
-                    allowBusySkip,
-                    semanticAccessAlreadyHeld && syntaxTrees.Length == 1),
-                cancellationToken);
+            var result = DocumentAnalyzerDriver.RunWithResult(
+                project, syntaxTree, compilation, analyzerOptions, Services.WorkspaceEventSink,
+                cancellationToken, allowBusySkip, semanticAccessAlreadyHeld && syntaxTrees.Length == 1);
+            succeeded &= result.Succeeded;
+            AddDiagnostics(diagnostics, result.Diagnostics, cancellationToken);
         }
 
-        return diagnostics
-            .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance)
-            .ToImmutableArray();
+        return new AnalyzerDiagnosticsResult(
+            diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray(), succeeded);
     }
 
     private static ImmutableArray<SyntaxTree> GetCompilationSyntaxTrees(

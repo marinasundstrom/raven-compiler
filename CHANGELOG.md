@@ -6,6 +6,12 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Incomplete document and project analyzer runs are no longer cached or published
+  as successful empty results. The editor preserves previous analyzer warnings
+  through failures and cancellation, then replaces them after a successful retry.
+- Analyzer diagnostics carry their origin into the language server, so external
+  analyzer warnings survive compiler-only diagnostic refreshes too.
+
 - Analyzer failure logs identify the analyzer, callback phase, exception, and
   affected document, including initialization failures. Repeated failures are
   counted without flooding logs, and incomplete runs are labeled explicitly.

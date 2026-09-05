@@ -199,5 +199,17 @@ phase, exception and stack trace, project, and document. Each analyzer emits at
 most one detailed failure event per callback phase per document analysis run;
 summary counters retain the total number of failures. The run summary uses
 `outcome=completedWithFailures` when a callback or initialization failed. Healthy
-analyzers continue to report diagnostics. Cancellation remains cancellation and
-is not logged as an analyzer failure.
+analyzers continue to run. Cancellation remains cancellation and is not logged
+as an analyzer failure.
+
+Document and project analyzer results carry an explicit completion status.
+Incomplete results are not stored in the analyzer caches or published to the
+editor. The existing retry scheduler keeps the last valid analyzer diagnostics
+visible while analysis is unavailable; a successful retry replaces them,
+including clearing warnings that no longer apply. Successful sub-results can
+still be reused when retrying a failed project analysis.
+
+Analyzer diagnostics include `Raven.AnalyzerName` in their properties and are
+presented with the `raven-analyzer` source. This origin metadata lets the editor
+preserve external analyzer warnings during compiler-only refreshes without
+relying on an analyzer-specific diagnostic ID prefix.

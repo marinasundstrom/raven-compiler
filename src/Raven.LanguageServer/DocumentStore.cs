@@ -980,7 +980,7 @@ internal sealed class DocumentStore
                         context.Value.Compilation,
                         out var projectDiagnosticsWithAnalyzers,
                         cancellationToken: effectiveCancellationToken))
-                    return new DiagnosticsComputationResult(Array.Empty<LspDiagnostic>(), WasSkipped: false);
+                    return new DiagnosticsComputationResult(Array.Empty<LspDiagnostic>(), WasSkipped: true);
 
                 diagnosticsForProject = projectDiagnosticsWithAnalyzers;
             }
@@ -1490,7 +1490,9 @@ internal sealed class DocumentStore
             Message = diagnostic.GetMessage(),
             Code = diagnostic.Id,
             Severity = MapSeverity(diagnostic.Severity),
-            Source = "raven",
+            Source = diagnostic.Properties.ContainsKey(Raven.CodeAnalysis.Diagnostics.AnalyzerDiagnosticProperties.AnalyzerName)
+                ? "raven-analyzer"
+                : "raven",
             Range = range,
             Tags = MapTags(diagnostic),
             Data = RavenDiagnosticData.Create(diagnostic)
