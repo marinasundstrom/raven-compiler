@@ -6,6 +6,52 @@ namespace Raven.CodeAnalysis.Tests.Workspaces;
 public sealed class AnalyzerDiagnosticRecoveryTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AsyncSemanticLease_ReleaseDoesNotCorruptCallerDepthAsync(bool tryEnter)
+    {
+        var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
+        var projectId = workspace.AddProject("Lease");
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddDocument(
+            DocumentId.CreateNew(projectId), "input.rvn", SourceText.From("class C {}"))).ShouldBeTrue();
+        var compilation = workspace.GetCompilation(projectId);
+        var model = compilation.GetSemanticModel(compilation.SyntaxTrees.Single());
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var lease = tryEnter
+            ? await model.TryEnterSemanticAccessAsync(timeout.Token)
+            : await model.EnterSemanticAccessAsync(timeout.Token);
+        lease.ShouldNotBeNull();
+        lease.Dispose();
+
+        using var access = model.EnterSemanticAccess(timeout.Token);
+        model.GetDiagnostics(timeout.Token).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ProjectAnalysis_BusySemanticAccessIsSkippedAndRetriedAsync()
+    {
+        var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
+        var projectId = workspace.AddProject("Busy");
+        var documentId = DocumentId.CreateNew(projectId);
+        workspace.TryApplyChanges(workspace.CurrentSolution
+            .AddDocument(documentId, "input.rvn", SourceText.From("func Main() { var value = 1 }"))
+            .AddAnalyzerReference(projectId, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
+        var compilation = workspace.GetCompilation(projectId);
+        var model = compilation.GetSemanticModel(compilation.SyntaxTrees.Single());
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using (await model.EnterSemanticAccessAsync(timeout.Token))
+        {
+            workspace.GetProjectAnalyzerResult(projectId, compilation,
+                cancellationToken: timeout.Token, allowBusySkip: true).Succeeded.ShouldBeFalse();
+        }
+
+        var recovered = workspace.GetProjectAnalyzerResult(projectId, compilation,
+            cancellationToken: timeout.Token, allowBusySkip: true);
+        recovered.Succeeded.ShouldBeTrue();
+        recovered.Diagnostics.ShouldContain(diagnostic => diagnostic.Id == VarCanBeLetAnalyzer.DiagnosticId);
+    }
+
+    [Theory]
     [InlineData("initialize", "documentId")]
     [InlineData("callback", "documentId")]
     [InlineData("cancel", "documentId")]

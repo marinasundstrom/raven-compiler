@@ -98,6 +98,11 @@ explicit lanes:
 - `ProjectCompiler`: compiler diagnostics for the project, filtered back to the current document.
 - `ProjectWithAnalyzers`: project diagnostics including analyzer diagnostics, filtered back to the current document.
 
+Background project analysis reserves semantic access without waiting before
+running compiler diagnostics or analyzer callbacks. If a document is busy, the
+run is incomplete and can be retried after the foreground request releases it.
+Incomplete results do not replace the project analyzer cache.
+
 Open, edit, and save use only the active editor lanes: `Syntax` immediately,
 then `DocumentCompiler` as a follow-up. This gives the editor a fast replacement
 diagnostic set for the new buffer while binder work completes in the background.

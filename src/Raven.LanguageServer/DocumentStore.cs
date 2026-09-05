@@ -979,7 +979,8 @@ internal sealed class DocumentStore
                         context.Value.Document,
                         context.Value.Compilation,
                         out var projectDiagnosticsWithAnalyzers,
-                        cancellationToken: effectiveCancellationToken))
+                        cancellationToken: effectiveCancellationToken,
+                        allowBusySkip: useBusySkip))
                     return new DiagnosticsComputationResult(Array.Empty<LspDiagnostic>(), WasSkipped: true);
 
                 diagnosticsForProject = projectDiagnosticsWithAnalyzers;
@@ -1191,7 +1192,7 @@ internal sealed class DocumentStore
         CompilationWithAnalyzersOptions? analyzerOptions,
         CancellationToken cancellationToken)
     {
-        _ = semanticModel;
+        using var ambientAccess = semanticModel.EnterAmbientSemanticAccess();
         return compilation
             .GetDocumentDiagnostics(syntaxTree, analyzerOptions, cancellationToken)
             .OrderBy(static diagnostic => diagnostic.Location)

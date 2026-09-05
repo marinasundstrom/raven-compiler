@@ -1539,13 +1539,15 @@ internal sealed class WorkspaceManager
         Compilation compilation,
         out ImmutableArray<CodeDiagnostic> diagnostics,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool allowBusySkip = false)
         => TryGetProjectAnalyzerDiagnostics(
             document.Project.Id,
             compilation,
             out diagnostics,
             analyzerOptions,
-            cancellationToken);
+            cancellationToken,
+            allowBusySkip);
 
     public bool TryGetDocumentDiagnostics(
         DocumentUri uri,
@@ -1696,11 +1698,12 @@ internal sealed class WorkspaceManager
         Compilation compilation,
         out ImmutableArray<CodeDiagnostic> diagnostics,
         CompilationWithAnalyzersOptions? analyzerOptions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowBusySkip = false)
     {
         try
         {
-            var result = _workspace.GetProjectAnalyzerResult(projectId, compilation, analyzerOptions, cancellationToken);
+            var result = _workspace.GetProjectAnalyzerResult(projectId, compilation, analyzerOptions, cancellationToken, allowBusySkip);
             diagnostics = result.Diagnostics;
             return result.Succeeded;
         }

@@ -3070,7 +3070,7 @@ record Person(
     }
 
     [Fact]
-    public async Task TryGetDiagnosticsAsync_ProjectWithAnalyzersLane_DoesNotRequireDocumentSemanticGateAsync()
+    public async Task TryGetDiagnosticsAsync_ProjectWithAnalyzersLane_SkipsBusyDocumentAndRetriesAsync()
     {
         Directory.CreateDirectory(_tempRoot);
 
@@ -3095,17 +3095,26 @@ func Main() -> () {
 """;
         await store.UpsertDocumentAsync(uri, code);
 
-        using var heldLease = await store.EnterDocumentSemanticAccessAsync(uri, CancellationToken.None, "test");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var heldLease = await store.EnterDocumentSemanticAccessAsync(uri, timeout.Token, "test");
         var diagnosticsTask = store.TryGetDiagnosticsAsync(
             uri,
             DocumentStore.DiagnosticLane.ProjectWithAnalyzers,
             shouldSkipWork: null,
-            cancellationToken: CancellationToken.None);
+            cancellationToken: timeout.Token);
 
         var completedTask = await Task.WhenAny(diagnosticsTask, Task.Delay(1000));
         completedTask.ShouldBe(diagnosticsTask);
 
         var result = await diagnosticsTask;
+        result.WasSkipped.ShouldBeTrue();
+        heldLease.Dispose();
+
+        result = await store.TryGetDiagnosticsAsync(
+            uri,
+            DocumentStore.DiagnosticLane.ProjectWithAnalyzers,
+            shouldSkipWork: null,
+            cancellationToken: timeout.Token);
         result.WasSkipped.ShouldBeFalse();
         result.Diagnostics.ShouldNotBeEmpty();
     }

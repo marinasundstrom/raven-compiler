@@ -564,7 +564,8 @@ public class Workspace
         ProjectId projectId,
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool allowBusySkip = false)
     {
         ArgumentNullException.ThrowIfNull(compilation);
 
@@ -572,14 +573,37 @@ public class Workspace
         var project = solution.GetProject(projectId)
             ?? throw new ArgumentException("Project not found", nameof(projectId));
 
-        return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken);
+        if (!allowBusySkip)
+            return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken);
+
+        var leases = new List<IDisposable>();
+        try
+        {
+            // Compiler diagnostics and analyzer callbacks can both enter semantic access.
+            // Reserve the project snapshot without waiting before either phase begins.
+            foreach (var tree in compilation.SyntaxTrees)
+            {
+                var lease = compilation.GetSemanticModel(tree).TryEnterSemanticAccess(cancellationToken);
+                if (lease is null)
+                    return new AnalyzerDiagnosticsResult([], Succeeded: false);
+                leases.Add(lease);
+            }
+
+            return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken, allowBusySkip: true);
+        }
+        finally
+        {
+            for (var i = leases.Count - 1; i >= 0; i--)
+                leases[i].Dispose();
+        }
     }
 
     private AnalyzerDiagnosticsResult GetProjectAnalyzerResult(
         Project project,
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowBusySkip = false)
     {
         var cacheKey = new ProjectAnalyzerDiagnosticsCacheKey(
             project.Id,
@@ -627,7 +651,7 @@ public class Workspace
                 cancellationToken.ThrowIfCancellationRequested();
                 analyzedTrees.UnionWith(GetCompilationSyntaxTrees(document, compilation));
                 var documentResult = GetDocumentAnalyzerResult(document, compilation, analyzerOptions,
-                    allowBusySkip: false, semanticAccessAlreadyHeld: false, cancellationToken);
+                    allowBusySkip: allowBusySkip, semanticAccessAlreadyHeld: false, cancellationToken);
                 succeeded &= documentResult.Succeeded;
                 AddDiagnostics(diagnostics, documentResult.Diagnostics, cancellationToken);
             }
@@ -640,7 +664,8 @@ public class Workspace
                     continue;
 
                 var treeResult = DocumentAnalyzerDriver.RunWithResult(
-                    project, tree, compilation, analyzerOptions, Services.WorkspaceEventSink, cancellationToken);
+                    project, tree, compilation, analyzerOptions, Services.WorkspaceEventSink, cancellationToken,
+                    allowBusySkip: allowBusySkip);
                 succeeded &= treeResult.Succeeded;
                 AddDiagnostics(diagnostics, treeResult.Diagnostics, cancellationToken);
             }

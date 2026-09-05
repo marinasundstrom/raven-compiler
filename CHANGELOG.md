@@ -26,6 +26,11 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Background project analyzer diagnostics skip busy semantic models and retry
+  without caching an incomplete result, preventing waits behind editor requests.
+- Releasing asynchronous semantic access no longer corrupts the caller's lock
+  depth, preventing subsequent diagnostics from blocking after editor queries.
+
 - Read-only source-generator documents now show compiler and analyzer diagnostics
   from the current project compilation and refresh them after source edits.
 

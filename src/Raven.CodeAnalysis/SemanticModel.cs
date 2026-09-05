@@ -169,13 +169,13 @@ public partial class SemanticModel
         if (!RequiresSemanticAccessGate)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _semanticAccessDepth.Value++;
-            return new SemanticAccessLease(this, releaseDepth: true, releaseGate: false);
+            return new SemanticAccessLease(this, releaseDepth: false, releaseGate: false);
         }
 
         await _semanticAccessGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        _semanticAccessDepth.Value++;
-        return new SemanticAccessLease(this, releaseDepth: true, releaseGate: true);
+        // AsyncLocal changes made here do not flow back into the awaiting caller.
+        // The caller establishes ambient access in its own execution context.
+        return new SemanticAccessLease(this, releaseDepth: false, releaseGate: true);
     }
 
     internal IDisposable EnterSemanticAccess(CancellationToken cancellationToken)
@@ -203,15 +203,13 @@ public partial class SemanticModel
         if (!RequiresSemanticAccessGate)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _semanticAccessDepth.Value++;
-            return new SemanticAccessLease(this, releaseDepth: true, releaseGate: false);
+            return new SemanticAccessLease(this, releaseDepth: false, releaseGate: false);
         }
 
         if (!await _semanticAccessGate.WaitAsync(0, cancellationToken).ConfigureAwait(false))
             return null;
 
-        _semanticAccessDepth.Value++;
-        return new SemanticAccessLease(this, releaseDepth: true, releaseGate: true);
+        return new SemanticAccessLease(this, releaseDepth: false, releaseGate: true);
     }
 
     internal IDisposable? TryEnterSemanticAccess(CancellationToken cancellationToken)
