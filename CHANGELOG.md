@@ -26,6 +26,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Namespace function accessibility validation now tolerates parser recovery
+  tokens in parameter lists, preserving diagnostics after local-symbol queries
+  in malformed async-lambda code.
+
 - Background project analyzer diagnostics skip busy semantic models and retry
   without caching an incomplete result, preventing waits behind editor requests.
 - Releasing asynchronous semantic access no longer corrupts the caller's lock

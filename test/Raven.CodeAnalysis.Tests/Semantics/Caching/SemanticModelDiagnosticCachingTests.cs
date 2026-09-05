@@ -7,6 +7,40 @@ namespace Raven.CodeAnalysis.Semantics.Tests;
 
 public sealed class SemanticModelDiagnosticCachingTests : CompilationTestBase
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AsyncLambdaLocalQuery_PreservesNamespaceFunctionSignatureForDiagnostics(bool malformedType)
+    {
+        var source = """
+import System.*
+import System.Threading.Tasks.*
+class RequestContext {
+    public val Text: string = "body"
+}
+func Main() -> unit {
+    Accept(async func (context: RequestContext) {
+        let content = await Task.FromResult(context.Text)
+        return "submitted: $content"
+    })
+}
+func Accept(handler: RequestContext -> Task<string>) -> unit { }
+""";
+        if (malformedType)
+            source = source.Replace("handler: RequestContext ->", "handler: func (RequestContext) ->", StringComparison.Ordinal);
+        var tree = SyntaxTree.ParseText(source);
+        var compilation = CreateCompilation(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var declarator = tree.GetRoot().DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .Single(node => node.Identifier.ValueText == "content");
+        _ = model.GetDeclaredSymbol(declarator);
+        var diagnostics = model.GetDocumentDiagnostics();
+        if (malformedType)
+            Assert.Contains(tree.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        else
+            Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
     [Fact]
     public void GetDocumentDiagnostics_StoresBinderDiagnosticsUnderExecutableOwner()
     {

@@ -1,5 +1,6 @@
 using System.Threading;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -22,6 +23,17 @@ public sealed class LanguageServerDiagnosticsTests : IDisposable
 {
     private const string ThisValueIsNotMutableDiagnosticId = "RAV0027";
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"raven-ls-diags-{Guid.NewGuid():N}");
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> _messages = new();
+        public string Messages => string.Join(Environment.NewLine, _messages);
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+            => _messages.Enqueue(formatter(state, exception) + (exception is null ? "" : Environment.NewLine + exception));
+    }
 
     private sealed class BlockingMethodSymbolAnalyzer : DiagnosticAnalyzer
     {
@@ -1482,7 +1494,8 @@ func Main(users: IQueryable<User>) {
             })
         });
 
-        var store = new DocumentStore(manager, NullLogger<DocumentStore>.Instance);
+        var logger = new RecordingLogger<DocumentStore>();
+        var store = new DocumentStore(manager, logger);
         var inlayHandler = new InlayHintHandler(store, NullLogger<InlayHintHandler>.Instance);
         var documentPath = Path.Combine(_tempRoot, "src", "main.rvn");
         var uri = DocumentUri.FromFileSystemPath(documentPath);
@@ -1501,7 +1514,7 @@ func Main() -> unit {
     })
 }
 
-func Accept(handler: func (RequestContext) -> Task<string>) -> unit { }
+func Accept(handler: RequestContext -> Task<string>) -> unit { }
 """;
         await store.UpsertDocumentAsync(uri, code);
         var sourceText = Raven.CodeAnalysis.Text.SourceText.From(code);
@@ -1517,7 +1530,7 @@ func Accept(handler: func (RequestContext) -> Task<string>) -> unit { }
             shouldSkipWork: null,
             cancellationToken: CancellationToken.None);
 
-        result.WasSkipped.ShouldBeFalse();
+        result.WasSkipped.ShouldBeFalse(logger.Messages);
         result.Diagnostics.ShouldNotContain(diagnostic =>
             diagnostic.Severity == LspDiagnosticSeverity.Error &&
             diagnostic.Message.Contains("'context' is not in scope", StringComparison.Ordinal));
@@ -2470,7 +2483,8 @@ union MyResult<T>(List<T> | int)
         File.Exists(documentPath).ShouldBeTrue();
 
         var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
-        var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
+        var logger = new RecordingLogger<WorkspaceManager>();
+        var manager = new WorkspaceManager(workspace, logger);
         manager.Initialize(new InitializeParams
         {
             WorkspaceFolders = new Container<WorkspaceFolder>(new WorkspaceFolder
@@ -2495,7 +2509,7 @@ union MyResult<T>(List<T> | int)
         diagnostics.Any(diagnostic =>
                 string.Equals(diagnostic.Code?.String, "RAV0103", StringComparison.Ordinal) &&
                 diagnostic.Message.Contains("'VehicleDbContext' is not in scope", StringComparison.Ordinal))
-            .ShouldBeFalse();
+            .ShouldBeFalse(logger.Messages);
     }
 
     [Fact]
