@@ -6,9 +6,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class MemberCanBeStaticCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(MemberCanBeStaticCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [MemberCanBeStaticAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -37,6 +40,7 @@ public sealed class MemberCanBeStaticCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Make method static",
                 context.Document.Id,
-                change.Value));
+                change.Value,
+                EquivalenceKey));
     }
 }

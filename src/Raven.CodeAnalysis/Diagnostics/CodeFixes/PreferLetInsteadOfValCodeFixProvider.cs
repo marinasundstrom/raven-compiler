@@ -6,10 +6,13 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class PreferLetInsteadOfValCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(PreferLetInsteadOfValCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds =
         [PreferLetInsteadOfValAnalyzer.PreferLetInsteadOfValDiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -25,6 +28,7 @@ public sealed class PreferLetInsteadOfValCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Replace 'val' with 'let'",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 }

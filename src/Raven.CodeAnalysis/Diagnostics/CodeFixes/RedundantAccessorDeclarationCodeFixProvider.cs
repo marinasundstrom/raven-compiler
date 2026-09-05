@@ -5,9 +5,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class RedundantAccessorDeclarationCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(RedundantAccessorDeclarationCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [RedundantAccessorDeclarationAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -28,6 +31,7 @@ public sealed class RedundantAccessorDeclarationCodeFixProvider : CodeFixProvide
             CodeAction.CreateTextChange(
                 "Remove redundant accessor list",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 }

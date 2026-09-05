@@ -1299,6 +1299,75 @@ public class Workspace
             .ToImmutableArray();
     }
 
+    /// <summary>Gets a Fix All action for equivalent fixes within the requested scope.</summary>
+    public CodeAction? GetFixAll(
+        ProjectId projectId,
+        CodeFixProvider provider,
+        FixAllScope scope,
+        string codeActionEquivalenceKey,
+        DocumentId? documentId = null,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (provider is null)
+            throw new ArgumentNullException(nameof(provider));
+        if (string.IsNullOrWhiteSpace(codeActionEquivalenceKey))
+            throw new ArgumentException("A Fix All action requires a non-empty equivalence key.", nameof(codeActionEquivalenceKey));
+
+        var solution = CurrentSolution;
+        var project = solution.GetProject(projectId)
+            ?? throw new ArgumentException("Project not found", nameof(projectId));
+        var document = documentId is { } requestedDocumentId
+            ? solution.GetDocument(requestedDocumentId)
+            : null;
+        if (scope == FixAllScope.Document && (document is null || document.Project.Id != projectId))
+            throw new ArgumentException("Document scope requires a document in the requested project.", nameof(documentId));
+
+        var fixAllProvider = provider.GetFixAllProvider();
+        if (fixAllProvider is null || !fixAllProvider.GetSupportedFixAllScopes().Contains(scope))
+            return null;
+
+        var supportedIds = fixAllProvider
+            .GetSupportedFixAllDiagnosticIds(provider)
+            .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        var supportsAllIds = supportedIds.Contains("*");
+        var diagnosticsByDocument = ImmutableDictionary.CreateBuilder<DocumentId, ImmutableArray<Diagnostic>>();
+        var projects = scope == FixAllScope.Solution ? solution.Projects : [project];
+
+        foreach (var candidateProject in projects)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var diagnostics = GetDiagnostics(candidateProject.Id, analyzerOptions, cancellationToken)
+                .Where(diagnostic => supportsAllIds || supportedIds.Contains(diagnostic.Id));
+            foreach (var diagnostic in diagnostics)
+            {
+                if (!TryGetDiagnosticDocument(candidateProject, diagnostic, out var diagnosticDocument))
+                    continue;
+                if (scope == FixAllScope.Document && diagnosticDocument.Id != document!.Id)
+                    continue;
+
+                diagnosticsByDocument[diagnosticDocument.Id] = diagnosticsByDocument.TryGetValue(diagnosticDocument.Id, out var existing)
+                    ? existing.Add(diagnostic)
+                    : [diagnostic];
+            }
+        }
+
+        if (diagnosticsByDocument.Count == 0)
+            return null;
+
+        return fixAllProvider.GetFixAsync(new FixAllContext(
+                solution,
+                project,
+                document,
+                provider,
+                scope,
+                codeActionEquivalenceKey,
+                diagnosticsByDocument.ToImmutable(),
+                cancellationToken))
+            .GetAwaiter()
+            .GetResult();
+    }
+
     /// <summary>
     /// Gets context-driven refactorings for the specified document and selection span.
     /// </summary>

@@ -13,6 +13,8 @@ public sealed class PreferOptionOverNullableCodeFixProvider : CodeFixProvider
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
 
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+
     public override void RegisterCodeFixes(CodeFixContext context)
     {
         var diagnostic = context.Diagnostic;
@@ -42,7 +44,8 @@ public sealed class PreferOptionOverNullableCodeFixProvider : CodeFixProvider
                 CodeAction.CreateTextChange(
                     $"Use '{suggestedType}'",
                     context.Document.Id,
-                    change));
+                    change,
+                    $"{nameof(PreferOptionOverNullableCodeFixProvider)}.UseType:{suggestedType}"));
         }
 
         if (!TryCreateRewriteToOptionAction(context.Document, root, diagnostic, suggestedType, out var rewriteAction))
@@ -126,7 +129,8 @@ public sealed class PreferOptionOverNullableCodeFixProvider : CodeFixProvider
                     text = text.WithChange(textChange);
 
                 return solution.WithDocumentText(document.Id, text);
-            });
+            },
+            nameof(PreferOptionOverNullableCodeFixProvider) + ".RewriteNullableHandling");
 
         return true;
     }

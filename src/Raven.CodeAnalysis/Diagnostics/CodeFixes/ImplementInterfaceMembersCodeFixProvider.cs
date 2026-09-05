@@ -9,6 +9,7 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class ImplementInterfaceMembersCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(ImplementInterfaceMembersCodeFixProvider);
     private const string PlaceholderExpression = "throw System.NotImplementedException()";
 
     private static readonly ImmutableArray<string> FixableIds =
@@ -23,6 +24,8 @@ public sealed class ImplementInterfaceMembersCodeFixProvider : CodeFixProvider
             SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -75,7 +78,8 @@ public sealed class ImplementInterfaceMembersCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Implement missing interface members",
                 context.Document.Id,
-                new TextChange(new TextSpan(insertion.Position, 0), insertion.Text)));
+                new TextChange(new TextSpan(insertion.Position, 0), insertion.Text),
+                EquivalenceKey));
     }
 
     private static bool IsPrimaryDiagnostic(CodeFixContext context, Diagnostic diagnostic)

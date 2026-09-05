@@ -9,9 +9,13 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class ConstructorParameterNamingCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(ConstructorParameterNamingCodeFixProvider);
+
     private static readonly ImmutableArray<string> FixableIds = [ConstructorParameterNamingAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -90,7 +94,8 @@ public sealed class ConstructorParameterNamingCodeFixProvider : CodeFixProvider
                     }
 
                     return solution.WithDocumentText(context.Document.Id, updated);
-                }));
+                },
+                EquivalenceKey));
     }
 
     private static SyntaxNode? GetRenameScope(ParameterSyntax parameter)

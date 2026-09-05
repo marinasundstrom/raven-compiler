@@ -7,9 +7,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class PreferIsNullOverEqualityCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(PreferIsNullOverEqualityCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [PreferIsNullOverEqualityAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -51,7 +54,8 @@ public sealed class PreferIsNullOverEqualityCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Use strict null check",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 
     private static bool IsNullLiteral(ExpressionSyntax expression)

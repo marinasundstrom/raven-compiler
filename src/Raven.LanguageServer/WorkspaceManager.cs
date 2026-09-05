@@ -21,6 +21,7 @@ using Raven.CodeAnalysis.Syntax;
 using Raven.CodeAnalysis.Text;
 
 using CodeDiagnostic = Raven.CodeAnalysis.Diagnostic;
+using CodeFixAction = Raven.CodeAnalysis.CodeAction;
 
 namespace Raven.LanguageServer;
 
@@ -1842,6 +1843,30 @@ internal sealed class WorkspaceManager
         }
 
         codeFixes = ImmutableArray<CodeFix>.Empty;
+        return false;
+    }
+
+    public bool TryGetFixAll(
+        DocumentUri uri,
+        CodeFix triggerFix,
+        FixAllScope scope,
+        out CodeFixAction? action,
+        CancellationToken cancellationToken = default)
+    {
+        if (TryResolveOwnedDocument(uri, out var ownedDocument) &&
+            triggerFix.Action.EquivalenceKey is { Length: > 0 } equivalenceKey)
+        {
+            action = _workspace.GetFixAll(
+                ownedDocument.ProjectId,
+                triggerFix.Provider,
+                scope,
+                equivalenceKey,
+                ownedDocument.DocumentId,
+                cancellationToken: cancellationToken);
+            return true;
+        }
+
+        action = null;
         return false;
     }
 

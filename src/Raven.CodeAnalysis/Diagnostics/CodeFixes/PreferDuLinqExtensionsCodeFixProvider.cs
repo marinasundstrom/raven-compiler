@@ -11,6 +11,8 @@ public sealed class PreferDuLinqExtensionsCodeFixProvider : CodeFixProvider
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
 
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+
     public override void RegisterCodeFixes(CodeFixContext context)
     {
         var diagnostic = context.Diagnostic;
@@ -42,7 +44,8 @@ public sealed class PreferDuLinqExtensionsCodeFixProvider : CodeFixProvider
                 CodeAction.CreateTextChange(
                     $"Replace with '{preferredName}'",
                     context.Document.Id,
-                    renameChange));
+                    renameChange,
+                    $"{nameof(PreferDuLinqExtensionsCodeFixProvider)}.Rename:{preferredName}"));
             return;
         }
 
@@ -66,6 +69,7 @@ public sealed class PreferDuLinqExtensionsCodeFixProvider : CodeFixProvider
                         .WithChange(new TextChange(replacementSpan, preferredName));
 
                     return solution.WithDocumentText(context.Document.Id, updatedText);
-                }));
+                },
+                $"{nameof(PreferDuLinqExtensionsCodeFixProvider)}.Placeholder:{preferredName}"));
     }
 }

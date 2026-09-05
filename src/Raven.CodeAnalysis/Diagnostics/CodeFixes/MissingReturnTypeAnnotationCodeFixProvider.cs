@@ -11,9 +11,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 /// </summary>
 public sealed class MissingReturnTypeAnnotationCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(MissingReturnTypeAnnotationCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [MissingReturnTypeAnnotationAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -44,7 +47,8 @@ public sealed class MissingReturnTypeAnnotationCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 $"Add return type annotation '-> {returnType}'",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 
     private static IBaseMethodOrFunctionDeclarationSyntax? FindDeclarationNode(SyntaxNode root, TextSpan diagnosticSpan)

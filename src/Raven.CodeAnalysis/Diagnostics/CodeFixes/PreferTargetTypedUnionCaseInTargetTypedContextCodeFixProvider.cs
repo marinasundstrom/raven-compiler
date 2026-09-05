@@ -6,10 +6,13 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class PreferTargetTypedUnionCaseInTargetTypedContextCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(PreferTargetTypedUnionCaseInTargetTypedContextCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds =
         [PreferTargetTypedUnionCaseInTargetTypedContextAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -39,6 +42,7 @@ public sealed class PreferTargetTypedUnionCaseInTargetTypedContextCodeFixProvide
             CodeAction.CreateTextChange(
                 "Rewrite to target-typed union case syntax",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 }

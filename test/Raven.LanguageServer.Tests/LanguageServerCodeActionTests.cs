@@ -13,7 +13,10 @@ using Raven.LanguageServer;
 
 namespace Raven.LanguageServer.Tests;
 
+using CodeDiagnostic = Raven.CodeAnalysis.Diagnostic;
+using CodeDiagnosticSeverity = Raven.CodeAnalysis.DiagnosticSeverity;
 using CodeFixAction = Raven.CodeAnalysis.CodeAction;
+using CodeLocation = Raven.CodeAnalysis.Location;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -309,6 +312,63 @@ missing
 
         result.ShouldNotBeNull();
         result!.ToArray().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_SourceFixAll_AppliesEquivalentFixesAcrossDocumentAsync()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var filePath = Path.Combine(_tempRoot, "main.rvn");
+        var uri = DocumentUri.FromFileSystemPath(filePath);
+        const string code = "bad bad";
+
+        var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
+        var manager = new WorkspaceManager(
+            workspace,
+            NullLogger<WorkspaceManager>.Instance,
+            ImmutableArray.Create<CodeFixProvider>(new RepeatedWordCodeFixProvider()),
+            ImmutableArray<CodeRefactoringProvider>.Empty);
+        manager.Initialize(new InitializeParams
+        {
+            WorkspaceFolders = new Container<WorkspaceFolder>(new WorkspaceFolder
+            {
+                Name = "temp",
+                Uri = DocumentUri.FromFileSystemPath(_tempRoot)
+            })
+        });
+
+        var store = new DocumentStore(manager, NullLogger<DocumentStore>.Instance);
+        var document = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(
+            workspace.CurrentSolution.AddAnalyzerReference(
+                document.Project.Id,
+                new AnalyzerReference(new RepeatedWordAnalyzer()))).ShouldBeTrue();
+        var handler = new CodeActionHandler(store, manager, NullLogger<CodeActionHandler>.Instance);
+        var result = await handler.Handle(
+            new CodeActionParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Range = new LspRange(new Position(0, 0), new Position(0, 0)),
+                Context = new CodeActionContext
+                {
+                    Only = new Container<CodeActionKind>(CodeActionKind.SourceFixAll)
+                }
+            },
+            CancellationToken.None);
+
+        result.ShouldNotBeNull();
+        var action = result!.Single().CodeAction;
+        action.ShouldNotBeNull();
+        action.Title.ShouldBe("Fix all in document: Replace 'bad' with 'good'");
+        action.Kind.ShouldBe(CodeActionKind.SourceFixAll);
+        var updatedText = SourceText.From(code);
+        foreach (var edit in action.Edit!.Changes![uri].OrderByDescending(edit => PositionHelper.ToOffset(updatedText, edit.Range.Start)))
+        {
+            var start = PositionHelper.ToOffset(updatedText, edit.Range.Start);
+            var end = PositionHelper.ToOffset(updatedText, edit.Range.End);
+            updatedText = updatedText.WithChange(new TextChange(TextSpan.FromBounds(start, end), edit.NewText));
+        }
+        updatedText.ToString().ShouldBe("good good");
     }
 
     [Fact]
@@ -626,5 +686,49 @@ func Test(maybeText: Option<string>) {
                 context.Document.Id,
                 new TextChange(context.Diagnostic.Location.SourceSpan, "replacement")));
         }
+    }
+
+    private sealed class RepeatedWordAnalyzer : DiagnosticAnalyzer
+    {
+        public const string DiagnosticId = "TESTFIXALL001";
+
+        private static readonly DiagnosticDescriptor Descriptor = DiagnosticDescriptor.Create(
+            DiagnosticId,
+            "Repeated word",
+            description: null,
+            helpLinkUri: string.Empty,
+            messageFormat: "Replace bad",
+            category: "Testing",
+            defaultSeverity: CodeDiagnosticSeverity.Warning);
+
+        public override void Initialize(AnalysisContext context)
+            => context.RegisterSyntaxTreeAction(action =>
+            {
+                var text = action.SyntaxTree.GetText().ToString();
+                for (var start = text.IndexOf("bad", StringComparison.Ordinal);
+                     start >= 0;
+                     start = text.IndexOf("bad", start + 3, StringComparison.Ordinal))
+                {
+                    action.ReportDiagnostic(CodeDiagnostic.Create(
+                        Descriptor,
+                        CodeLocation.Create(action.SyntaxTree, new TextSpan(start, 3))));
+                }
+            });
+    }
+
+    private sealed class RepeatedWordCodeFixProvider : CodeFixProvider
+    {
+        private const string EquivalenceKey = nameof(RepeatedWordCodeFixProvider);
+
+        public override IEnumerable<string> FixableDiagnosticIds => [RepeatedWordAnalyzer.DiagnosticId];
+
+        public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+
+        public override void RegisterCodeFixes(CodeFixContext context)
+            => context.RegisterCodeFix(CodeFixAction.CreateTextChange(
+                "Replace 'bad' with 'good'",
+                context.Document.Id,
+                new TextChange(context.Diagnostic.Location.SourceSpan, "good"),
+                EquivalenceKey));
     }
 }

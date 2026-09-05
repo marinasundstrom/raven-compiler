@@ -6,6 +6,13 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Added
 
+- Added Roslyn-shaped Fix All support with document, project, and solution
+  scopes, stable code-action equivalence keys, and a reusable batch provider
+  that merges non-overlapping text changes.
+- All built-in code-fix providers now opt into Fix All where they offer a
+  repeatable correction, and the language server exposes document-wide fixes
+  through the standard `source.fixAll` action.
+
 - `.editorconfig` supports per-file `generated_code = true` or `false` analyzer
   classification, including live updates in the language server.
 - Generated-code analyzer policies now recognize `GeneratedCodeAttribute` on
