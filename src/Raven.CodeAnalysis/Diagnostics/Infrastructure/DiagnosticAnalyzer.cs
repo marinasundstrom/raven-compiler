@@ -13,7 +13,7 @@ namespace Raven.CodeAnalysis.Diagnostics;
 public abstract class DiagnosticAnalyzer
 {
     private readonly object _initializationGate = new();
-    private bool _initialized;
+    private volatile bool _initialized;
     private readonly List<Action<CompilationAnalysisContext>> _compilationActions = new();
     private readonly List<Action<SyntaxTreeAnalysisContext>> _syntaxTreeActions = new();
     private readonly List<SymbolActionRegistration> _symbolActions = new();
@@ -38,13 +38,27 @@ public abstract class DiagnosticAnalyzer
 
             try
             {
+                // Publish registrations only after initialization succeeds. A failed or
+                // canceled attempt must not leave callbacks or concurrency settings behind.
+                var compilationActions = new List<Action<CompilationAnalysisContext>>();
+                var syntaxTreeActions = new List<Action<SyntaxTreeAnalysisContext>>();
+                var symbolActions = new List<SymbolActionRegistration>();
+                var syntaxNodeActions = new List<SyntaxNodeActionRegistration>();
+                var operationActions = new List<OperationActionRegistration>();
+                var concurrentExecutionEnabled = false;
                 Initialize(new AnalysisContext(
-                    _compilationActions,
-                    _syntaxTreeActions,
-                    _symbolActions,
-                    _syntaxNodeActions,
-                    _operationActions,
-                    () => _concurrentExecutionEnabled = true));
+                    compilationActions,
+                    syntaxTreeActions,
+                    symbolActions,
+                    syntaxNodeActions,
+                    operationActions,
+                    () => concurrentExecutionEnabled = true));
+                _compilationActions.AddRange(compilationActions);
+                _syntaxTreeActions.AddRange(syntaxTreeActions);
+                _symbolActions.AddRange(symbolActions);
+                _syntaxNodeActions.AddRange(syntaxNodeActions);
+                _operationActions.AddRange(operationActions);
+                _concurrentExecutionEnabled = concurrentExecutionEnabled;
                 _initialized = true;
                 return true;
             }

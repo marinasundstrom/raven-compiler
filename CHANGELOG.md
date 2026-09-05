@@ -6,6 +6,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Retrying failed or canceled analyzer initialization no longer duplicates
+  callbacks or retains concurrency settings from the unsuccessful attempt.
+
 - Go to Definition opens source-generator output as a read-only, live Raven
   document, including hover and navigation back to handwritten source, without
   requiring generated files on disk.
