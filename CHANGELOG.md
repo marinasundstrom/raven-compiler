@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Analyzer failure logs identify the analyzer, callback phase, exception, and
+  affected document, including initialization failures. Repeated failures are
+  counted without flooding logs, and incomplete runs are labeled explicitly.
+
 - Retrying failed or canceled analyzer initialization no longer duplicates
   callbacks or retains concurrency settings from the unsuccessful attempt.
 

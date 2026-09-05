@@ -98,10 +98,11 @@ internal sealed class DocumentAnalyzerDriver
             ReportSymbolEnumerationStats();
             ReportAnalyzerStats(executions);
 
+            var failureCount = executions.Sum(static execution => execution.Stats.Failures);
             ReportWorkspaceEvent(
                 "documentAnalyzer.total",
                 Stopwatch.GetElapsedTime(totalTimestamp).TotalMilliseconds,
-                $"analyzers={executions.Count}, diagnostics={_diagnostics.Count}, outcome=completed");
+                $"analyzers={executions.Count}, diagnostics={_diagnostics.Count}, failures={failureCount}, outcome={(failureCount == 0 ? "completed" : "completedWithFailures")}");
 
             return _diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray();
         }
@@ -134,9 +135,10 @@ internal sealed class DocumentAnalyzerDriver
         var execution = new AnalyzerExecution(analyzer, stats);
         var isInternalAnalyzer = AnalyzerDiagnosticIdValidator.IsInternalAnalyzer(analyzer);
         var initializationTimestamp = Stopwatch.GetTimestamp();
-        if (!analyzer.TryEnsureInitialized())
+        if (!analyzer.TryEnsureInitialized(out var initializationException))
         {
             stats.InitializationTicks += Stopwatch.GetTimestamp() - initializationTimestamp;
+            RecordAnalyzerFailure(stats, "Initialize", initializationException!);
             return execution;
         }
 
@@ -210,11 +212,11 @@ internal sealed class DocumentAnalyzerDriver
             {
                 throw;
             }
-            catch
+            catch (Exception exception)
             {
                 // Analyzer failures should not stop normal compilation diagnostics.
                 action.Stats.CompilationActionCount++;
-                action.Stats.Failures++;
+                RecordAnalyzerFailure(action.Stats, "Compilation", exception);
             }
         }
     }
@@ -284,11 +286,11 @@ internal sealed class DocumentAnalyzerDriver
             {
                 throw;
             }
-            catch
+            catch (Exception exception)
             {
                 // Analyzer failures should not stop normal compilation diagnostics.
                 action.Stats.SyntaxTreeActionCount++;
-                action.Stats.Failures++;
+                RecordAnalyzerFailure(action.Stats, "SyntaxTree", exception);
             }
         }
     }
@@ -694,11 +696,11 @@ internal sealed class DocumentAnalyzerDriver
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             // Analyzer failures should not stop normal compilation diagnostics.
             action.Stats.SyntaxNodeActionCount++;
-            action.Stats.Failures++;
+            RecordAnalyzerFailure(action.Stats, "SyntaxNode", exception);
         }
     }
 
@@ -723,11 +725,11 @@ internal sealed class DocumentAnalyzerDriver
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             // Analyzer failures should not stop normal compilation diagnostics.
             action.Stats.SymbolActionCount++;
-            action.Stats.Failures++;
+            RecordAnalyzerFailure(action.Stats, "Symbol", exception);
         }
     }
 
@@ -754,12 +756,21 @@ internal sealed class DocumentAnalyzerDriver
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             // Analyzer failures should not stop normal compilation diagnostics.
             action.Stats.OperationActionCount++;
-            action.Stats.Failures++;
+            RecordAnalyzerFailure(action.Stats, "Operation", exception);
         }
+    }
+
+    private void RecordAnalyzerFailure(DocumentAnalyzerStats stats, string phase, Exception exception)
+    {
+        stats.Failures++;
+        // A failing node callback may throw thousands of times. Keep one detailed
+        // event per phase and analyzer, while retaining the total failure count.
+        if (stats.ReportedFailurePhases.Add(phase))
+            ReportWorkspaceEvent("documentAnalyzer.failure", 0, $"{stats.AnalyzerName}: phase={phase}, exception={exception}");
     }
 
     private void ReportAnalyzerStats(IReadOnlyList<AnalyzerExecution> executions)
@@ -871,6 +882,7 @@ internal sealed class DocumentAnalyzerDriver
         public int OperationActionCount;
         public int Diagnostics;
         public int Failures;
+        public HashSet<string> ReportedFailurePhases { get; } = [];
         public bool ConcurrentExecutionEnabled;
 
         public double TotalMilliseconds => TicksToMilliseconds(

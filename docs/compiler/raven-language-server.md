@@ -192,3 +192,12 @@ editor can fill in missing hints without blocking broad scrolling requests.
 Full-document inlay responses should prioritize labels and source-applicable
 text edits over tooltip markdown. Focused range requests can include richer
 tooltip content because they are tied to the user's current view or cursor.
+
+Analyzer exceptions appear as warning-level workspace events even when they
+fail immediately. `documentAnalyzer.failure` records the analyzer type, callback
+phase, exception and stack trace, project, and document. Each analyzer emits at
+most one detailed failure event per callback phase per document analysis run;
+summary counters retain the total number of failures. The run summary uses
+`outcome=completedWithFailures` when a callback or initialization failed. Healthy
+analyzers continue to report diagnostics. Cancellation remains cancellation and
+is not logged as an analyzer failure.

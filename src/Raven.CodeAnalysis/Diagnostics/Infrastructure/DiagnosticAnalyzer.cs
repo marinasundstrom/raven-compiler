@@ -26,8 +26,11 @@ public abstract class DiagnosticAnalyzer
 
     public virtual ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [];
 
-    internal bool TryEnsureInitialized()
+    internal bool TryEnsureInitialized() => TryEnsureInitialized(out _);
+
+    internal bool TryEnsureInitialized(out Exception? initializationException)
     {
+        initializationException = null;
         if (_initialized)
             return true;
 
@@ -66,8 +69,9 @@ public abstract class DiagnosticAnalyzer
             {
                 throw;
             }
-            catch
+            catch (Exception exception)
             {
+                initializationException = exception;
                 return false;
             }
         }
