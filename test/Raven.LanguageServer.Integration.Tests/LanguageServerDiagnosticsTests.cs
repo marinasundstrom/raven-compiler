@@ -811,7 +811,9 @@ class UiPanel {
 """;
         var updatedCode = code.Replace("        self.title = title\n", string.Empty, StringComparison.Ordinal);
 
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new UnusedParameterAnalyzer()))).ShouldBeTrue();
         var beforeResult = await store.TryGetDocumentWithAnalyzersDiagnosticsAsync(
             uri,
             shouldSkipWork: null,
@@ -1068,7 +1070,9 @@ func Main() -> () {
     count
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
 
         var firstAnalyzerResult = await store.TryGetDiagnosticsAsync(
             uri,
@@ -1124,7 +1128,9 @@ func Main() -> () {
     count
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
 
         var firstResult = await store.TryGetDiagnosticsAsync(
             uri,
@@ -1191,6 +1197,14 @@ func Main() -> () {
     public async Task TryGetDiagnosticsAsync_DocumentWithAnalyzersLane_DoesNotReuseStaleCompilerDiagnosticsAfterProjectChangeAsync()
     {
         Directory.CreateDirectory(_tempRoot);
+        File.WriteAllText(Path.Combine(_tempRoot, "main.rvn"), string.Empty);
+        File.WriteAllText(Path.Combine(_tempRoot, "test.rvn"), string.Empty);
+        WriteProject(_tempRoot, "Shared", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <ItemGroup><Compile Include="*.rvn" /></ItemGroup>
+            </Project>
+            """);
 
         var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
         var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
@@ -1214,7 +1228,9 @@ func Main() -> () {
     Test()
 }
 """;
-        await store.UpsertDocumentAsync(mainUri, mainCode);
+        var authoredDocument = await store.UpsertDocumentAsync(mainUri, mainCode);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
 
         var compilerResult = await store.TryGetDiagnosticsAsync(
             mainUri,
@@ -1226,10 +1242,12 @@ func Main() -> () {
             string.Equals(diagnostic.Code?.String, "RAV0103", StringComparison.Ordinal) &&
             diagnostic.Message.Contains("Test", StringComparison.Ordinal)).ShouldBeTrue();
 
-        await store.UpsertDocumentAsync(testUri, """
-func Test() -> () {
+        var addedDocument = await store.UpsertDocumentAsync(testUri, """
+public func Test() -> () {
 }
 """);
+
+        addedDocument.Project.Id.ShouldBe(authoredDocument.Project.Id);
 
         var analyzerResult = await store.TryGetDiagnosticsAsync(
             mainUri,
