@@ -42,6 +42,12 @@ discovers projects as before, so a solution file is never required. Creating,
 changing, or deleting a `.sln` or `.slnx` file reloads the group while
 preserving open document text.
 
+Opening a file under the workspace also checks its ancestor directories for
+projects omitted from the solution. The server loads these on demand and uses
+their evaluated compile items to determine ownership, so sibling types and
+project references remain available in nested samples. Explicitly excluded
+files retain file-based application behavior.
+
 A source file that is not included by an evaluated project is treated as the
 root of its own file-based application. It receives an isolated ephemeral
 project with the standard Raven prelude, framework references, `Raven.Core`,

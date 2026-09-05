@@ -2443,6 +2443,9 @@ internal sealed class WorkspaceManager
         if (TryFindProjectDocument(normalizedPath, out var projectId))
             return projectId;
 
+        if (TryOpenContainingProject(normalizedPath, out projectId))
+            return projectId;
+
         if (_fileApplicationProjectsByRoot.TryGetValue(normalizedPath, out projectId) &&
             _workspace.CurrentSolution.GetProject(projectId) is not null)
         {
@@ -2452,6 +2455,64 @@ internal sealed class WorkspaceManager
         projectId = CreateFileApplicationProject(normalizedPath);
         _fileApplicationProjectsByRoot[normalizedPath] = projectId;
         return projectId;
+    }
+
+    private bool TryOpenContainingProject(string documentPath, out ProjectId projectId)
+    {
+        projectId = default;
+        var projectSystem = _workspace.Services.ProjectSystemService;
+        if (projectSystem is null)
+            return false;
+
+        var loadedProjects = _workspace.CurrentSolution.Projects
+            .Where(project => !string.IsNullOrWhiteSpace(project.FilePath) &&
+                projectSystem.CanOpenProject(project.FilePath))
+            .ToDictionary(project => NormalizePath(project.FilePath!), project => project.Id,
+                StringComparer.OrdinalIgnoreCase);
+
+        // Solution membership controls startup loading. An opened file can also
+        // belong to an unlisted sample or tool project within the workspace.
+        for (var directory = Path.GetDirectoryName(documentPath);
+             directory is not null && _workspaceRoots.Any(root => IsWithinRoot(directory, root));
+             directory = Path.GetDirectoryName(directory))
+        {
+            string[] candidates;
+            try
+            {
+                candidates = Directory.GetFiles(directory, "*.*proj", SearchOption.TopDirectoryOnly);
+            }
+            catch (IOException)
+            {
+                continue;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (var candidate in candidates.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!projectSystem.CanOpenProject(candidate) ||
+                    loadedProjects.ContainsKey(NormalizePath(candidate)) || ShouldSkipProjectOpen(candidate))
+                    continue;
+
+                try
+                {
+                    _ = OpenProjectWithReferences(candidate, projectSystem, loadedProjects,
+                        new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+                    // Evaluated Compile items, including exclusions, decide ownership.
+                    if (TryFindProjectDocument(documentPath, out projectId))
+                        return true;
+                }
+                catch (Exception ex)
+                {
+                    RecordProjectOpenFailure(candidate, ex);
+                    _logger.LogWarning(ex, "Failed to open containing Raven project '{ProjectFilePath}'.", candidate);
+                }
+            }
+        }
+
+        return false;
     }
 
     private bool TryFindProjectDocument(string normalizedPath, out ProjectId projectId)

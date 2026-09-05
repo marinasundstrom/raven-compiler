@@ -26,6 +26,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Opening a source file in a nested project omitted from the workspace solution
+  now loads its containing project on demand, restoring sibling type lookup
+  while respecting evaluated compile exclusions.
+
 - Namespace function accessibility validation now tolerates parser recovery
   tokens in parameter lists, preserving diagnostics after local-symbol queries
   in malformed async-lambda code.
