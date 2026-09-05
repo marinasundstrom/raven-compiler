@@ -162,6 +162,8 @@ internal sealed class DocumentAnalyzerDriver
 
         void ReportDiagnostic(Diagnostic diagnostic)
         {
+            if (!analyzer.ShouldReportDiagnostic(diagnostic))
+                return;
             AnalyzerDiagnosticIdValidator.Validate(analyzer, diagnostic, isInternalAnalyzer);
 
             var mapped = _compilation.ApplyCompilationOptions(
@@ -178,6 +180,9 @@ internal sealed class DocumentAnalyzerDriver
         }
 
         CollectCompilationActions(analyzer, execution, ReportDiagnostic, stats);
+        if (!analyzer.ShouldAnalyzeTree(_syntaxTree))
+            return execution;
+
         CollectSyntaxTreeActions(analyzer, execution, ReportDiagnostic, stats);
         CollectSymbolActions(analyzer, execution, ReportDiagnostic, stats);
         CollectSyntaxNodeActions(analyzer, execution, ReportDiagnostic, stats);

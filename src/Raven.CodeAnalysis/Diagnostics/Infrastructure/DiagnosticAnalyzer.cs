@@ -20,6 +20,7 @@ public abstract class DiagnosticAnalyzer
     private readonly List<SyntaxNodeActionRegistration> _syntaxNodeActions = new();
     private readonly List<OperationActionRegistration> _operationActions = new();
     private bool _concurrentExecutionEnabled;
+    private GeneratedCodeAnalysisFlags _generatedCodeAnalysis;
 
     /// <summary>Implement to register analysis actions.</summary>
     public abstract void Initialize(AnalysisContext context);
@@ -49,19 +50,22 @@ public abstract class DiagnosticAnalyzer
                 var syntaxNodeActions = new List<SyntaxNodeActionRegistration>();
                 var operationActions = new List<OperationActionRegistration>();
                 var concurrentExecutionEnabled = false;
+                var generatedCodeAnalysis = GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics;
                 Initialize(new AnalysisContext(
                     compilationActions,
                     syntaxTreeActions,
                     symbolActions,
                     syntaxNodeActions,
                     operationActions,
-                    () => concurrentExecutionEnabled = true));
+                    () => concurrentExecutionEnabled = true,
+                    flags => generatedCodeAnalysis = flags));
                 _compilationActions.AddRange(compilationActions);
                 _syntaxTreeActions.AddRange(syntaxTreeActions);
                 _symbolActions.AddRange(symbolActions);
                 _syntaxNodeActions.AddRange(syntaxNodeActions);
                 _operationActions.AddRange(operationActions);
                 _concurrentExecutionEnabled = concurrentExecutionEnabled;
+                _generatedCodeAnalysis = generatedCodeAnalysis;
                 _initialized = true;
                 return true;
             }
@@ -89,6 +93,13 @@ public abstract class DiagnosticAnalyzer
 
     internal bool ConcurrentExecutionEnabled => _concurrentExecutionEnabled;
 
+    internal bool ShouldAnalyzeTree(SyntaxTree tree)
+        => !tree.IsGenerated || (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0;
+
+    internal bool ShouldReportDiagnostic(Diagnostic diagnostic)
+        => diagnostic.Location.SourceTree?.IsGenerated != true ||
+            (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.ReportDiagnostics) != 0;
+
     /// <summary>Runs the analyzer for the specified compilation.</summary>
     public IEnumerable<Diagnostic> Analyze(Compilation compilation, CancellationToken cancellationToken = default)
         => Analyze(compilation, syntaxTree: null, cancellationToken);
@@ -105,6 +116,11 @@ public abstract class DiagnosticAnalyzer
 
         var succeeded = true;
         var diagnostics = new List<Diagnostic>();
+        void ReportDiagnostic(Diagnostic diagnostic)
+        {
+            if (ShouldReportDiagnostic(diagnostic))
+                diagnostics.Add(diagnostic);
+        }
         var syntaxTrees = syntaxTree is null
             ? compilation.SyntaxTrees
             : [syntaxTree];
@@ -114,7 +130,7 @@ public abstract class DiagnosticAnalyzer
             var compilationContext = new CompilationAnalysisContext(
                 compilation,
                 syntaxTree,
-                diagnostics.Add,
+                ReportDiagnostic,
                 cancellationToken);
 
             try
@@ -134,7 +150,9 @@ public abstract class DiagnosticAnalyzer
 
         foreach (var tree in syntaxTrees)
         {
-            var treeContext = new SyntaxTreeAnalysisContext(tree, compilation, diagnostics.Add, cancellationToken);
+            if (!ShouldAnalyzeTree(tree))
+                continue;
+            var treeContext = new SyntaxTreeAnalysisContext(tree, compilation, ReportDiagnostic, cancellationToken);
             foreach (var action in _syntaxTreeActions)
             {
                 try
@@ -165,7 +183,7 @@ public abstract class DiagnosticAnalyzer
                         var symbolContext = new SymbolAnalysisContext(
                             symbol,
                             compilation,
-                            diagnostics.Add,
+                            ReportDiagnostic,
                             cancellationToken);
 
                         try
@@ -204,7 +222,7 @@ public abstract class DiagnosticAnalyzer
                             node,
                             semanticModel,
                             compilation,
-                            diagnostics.Add,
+                            ReportDiagnostic,
                             cancellationToken);
 
                         try
@@ -243,7 +261,7 @@ public abstract class DiagnosticAnalyzer
                         operation,
                         semanticModel,
                         compilation,
-                        diagnostics.Add,
+                        ReportDiagnostic,
                         cancellationToken);
 
                     try
@@ -312,6 +330,7 @@ public sealed class AnalysisContext
     private readonly List<SyntaxNodeActionRegistration> _syntaxNodeActions;
     private readonly List<OperationActionRegistration> _operationActions;
     private readonly Action _enableConcurrentExecution;
+    private readonly Action<GeneratedCodeAnalysisFlags> _configureGeneratedCodeAnalysis;
 
     internal AnalysisContext(
         List<Action<CompilationAnalysisContext>> compilationActions,
@@ -319,7 +338,8 @@ public sealed class AnalysisContext
         List<SymbolActionRegistration> symbolActions,
         List<SyntaxNodeActionRegistration> syntaxNodeActions,
         List<OperationActionRegistration> operationActions,
-        Action enableConcurrentExecution)
+        Action enableConcurrentExecution,
+        Action<GeneratedCodeAnalysisFlags> configureGeneratedCodeAnalysis)
     {
         _compilationActions = compilationActions;
         _syntaxTreeActions = syntaxTreeActions;
@@ -327,6 +347,7 @@ public sealed class AnalysisContext
         _syntaxNodeActions = syntaxNodeActions;
         _operationActions = operationActions;
         _enableConcurrentExecution = enableConcurrentExecution;
+        _configureGeneratedCodeAnalysis = configureGeneratedCodeAnalysis;
     }
 
     /// <summary>
@@ -335,6 +356,10 @@ public sealed class AnalysisContext
     /// </summary>
     public void EnableConcurrentExecution()
         => _enableConcurrentExecution();
+
+    /// <summary>Configures callbacks and reporting for source-generated trees. The default enables both.</summary>
+    public void ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags analysisMode)
+        => _configureGeneratedCodeAnalysis(analysisMode);
 
     /// <summary>Registers an action executed once for the compilation being analyzed.</summary>
     public void RegisterCompilationAction(Action<CompilationAnalysisContext> action)

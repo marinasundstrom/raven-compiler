@@ -40,10 +40,88 @@ public sealed class GeneratedSourceAnalyzerTests
         analyzer.Calls.ShouldBe(calls);
     }
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(3, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    [InlineData(3, true)]
+    public void GeneratedCodePolicy_ControlsCallbacksAndReportingIndependently(int flags, bool projectLane)
+    {
+        var analyzer = new PolicyAnalyzer((GeneratedCodeAnalysisFlags)flags);
+        var workspace = CreateWorkspace(true, analyzer, out var projectId);
+        var diagnostics = projectLane
+            ? workspace.GetProjectAnalyzerDiagnostics(projectId)
+            : workspace.GetDiagnostics(projectId);
+        var analyzeGenerated = (flags & 1) != 0;
+        var reportGenerated = (flags & 2) != 0;
+        analyzer.TreeCalls.ShouldBe(analyzeGenerated ? 3 : 1);
+        analyzer.CompilationCalls.ShouldBe(1);
+        diagnostics.Count(diagnostic => diagnostic.Id == "AN9041").ShouldBe(
+            1 + (reportGenerated ? 1 + (analyzeGenerated ? 2 : 0) : 0));
+    }
+
+    [Fact]
+    public void FailedInitialization_DoesNotRetainGeneratedCodePolicy()
+    {
+        var analyzer = new PolicyAnalyzer(null) { FailInitialization = true };
+        var workspace = CreateWorkspace(true, analyzer, out var projectId);
+        workspace.GetDiagnostics(projectId);
+        analyzer.FailInitialization = false;
+        workspace.GetDiagnostics(projectId).Count(diagnostic => diagnostic.Id == "AN9041").ShouldBe(4);
+        analyzer.TreeCalls.ShouldBe(3);
+    }
+
+    [Fact]
+    public void GeneratedProvenance_SurvivesTextChangesAndDoesNotDependOnFileName()
+    {
+        var workspace = CreateWorkspace(false, new TreeAnalyzer(), out var projectId);
+        var compilation = workspace.GetCompilation(projectId);
+        var generated = compilation.SyntaxTrees.Single(tree => tree.FilePath.EndsWith("Visible.rvn"));
+        var changed = generated.WithChangedText(SourceText.From("class Changed {}"));
+        var authored = Raven.CodeAnalysis.Syntax.SyntaxTree.ParseText("class Authored {}", path: generated.FilePath);
+        generated.IsGenerated.ShouldBeTrue();
+        changed.IsGenerated.ShouldBeTrue();
+        authored.IsGenerated.ShouldBeFalse();
+    }
+
+    private sealed class PolicyAnalyzer(GeneratedCodeAnalysisFlags? flags) : DiagnosticAnalyzer
+    {
+        public bool FailInitialization { get; set; }
+        public int TreeCalls { get; private set; }
+        public int CompilationCalls { get; private set; }
+        private static readonly DiagnosticDescriptor Rule = DiagnosticDescriptor.Create(
+            "AN9041", "Policy", null, "", "Policy", "Testing", DiagnosticSeverity.Warning);
+        public override void Initialize(AnalysisContext context)
+        {
+            if (FailInitialization)
+            {
+                context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+                throw new InvalidOperationException("Initialization failed after configuration");
+            }
+            if (flags.HasValue)
+                context.ConfigureGeneratedCodeAnalysis(flags.Value);
+            context.RegisterCompilationAction(action =>
+            {
+                CompilationCalls++;
+                var tree = action.Compilation.SyntaxTrees.Single(tree => tree.FilePath.EndsWith("Visible.rvn"));
+                action.ReportDiagnostic(Diagnostic.Create(Rule, Location.Create(tree, new TextSpan(1, 1))));
+            });
+            context.RegisterSyntaxTreeAction(action =>
+            {
+                TreeCalls++;
+                action.ReportDiagnostic(Diagnostic.Create(Rule, Location.Create(action.SyntaxTree, new TextSpan(0, 1))));
+            });
+        }
+    }
+
     private static bool IsTestDiagnostic(Diagnostic diagnostic) => diagnostic.Id == "AN9040";
     private static string Key(Diagnostic diagnostic) => $"{diagnostic.Location.SourceTree!.FilePath}:{diagnostic.IsSuppressed}";
 
-    private static AdhocWorkspace CreateWorkspace(bool authoredDocument, TreeAnalyzer analyzer, out ProjectId projectId)
+    private static AdhocWorkspace CreateWorkspace(bool authoredDocument, DiagnosticAnalyzer analyzer, out ProjectId projectId)
     {
         var workspace = new AdhocWorkspace();
         var solution = workspace.CurrentSolution.AddProject("GeneratedAnalysis");

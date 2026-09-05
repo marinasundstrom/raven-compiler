@@ -221,3 +221,17 @@ generators, even when they have no authored workspace document. Each generated
 tree uses the same analyzer driver and source suppression rules as authored
 code. Compilation callbacks still run once per project, and a failure in a
 generated tree prevents caching an incomplete project result.
+
+Analyzers can call `context.ConfigureGeneratedCodeAnalysis(...)` during
+initialization. `GeneratedCodeAnalysisFlags.None` skips callbacks on generated
+trees and filters analyzer diagnostics located there; `Analyze` enables callbacks,
+and `ReportDiagnostics` enables reporting. Combine the flags to enable both.
+Compilation callbacks still execute, and their diagnostics follow the same
+location-based reporting policy. Diagnostics without a source location are not
+filtered by this policy. Unconfigured analyzers retain both flags by default.
+
+This policy currently identifies trees produced by Raven source generators using
+compiler-owned provenance, retained across text changes. It does not infer
+generated code from file names, comments, or attributes. Compiler diagnostics and
+source suppression directives retain their existing behavior. Configuration is
+published only after analyzer initialization succeeds.

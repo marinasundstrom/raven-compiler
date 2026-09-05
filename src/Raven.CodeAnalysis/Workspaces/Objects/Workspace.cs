@@ -700,6 +700,8 @@ public class Workspace
 
                 void ReportDiagnostic(Diagnostic diagnostic)
                 {
+                    if (!analyzer.ShouldReportDiagnostic(diagnostic))
+                        return;
                     AnalyzerDiagnosticIdValidator.Validate(analyzer, diagnostic, isInternalAnalyzer);
 
                     var mapped = compilation.ApplyCompilationOptions(

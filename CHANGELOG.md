@@ -4,6 +4,12 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ## Unreleased
 
+### Added
+
+- Analyzers can configure source-generated tree callbacks and diagnostic reporting
+  independently with `ConfigureGeneratedCodeAnalysis` and `GeneratedCodeAnalysisFlags`.
+  Unconfigured analyzers retain the existing analyze-and-report behavior.
+
 ### Fixed
 
 - Project analyzer diagnostics now include source-generated syntax trees, honor
