@@ -1088,6 +1088,7 @@ class C {
                 typeof(UnusedImportDirectiveAnalyzer),
                 typeof(DisposableObjectAnalyzer),
                 typeof(UnusedExpressionResultAnalyzer),
+                typeof(UnawaitedTaskAnalyzer),
                 typeof(UnsafeUnwrapAnalyzer),
             ],
             analyzerTypes);

@@ -46,7 +46,7 @@ internal sealed class CodeActionHandler : ICodeActionHandler
         => new()
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("raven"),
-            CodeActionKinds = new Container<CodeActionKind>(CodeActionKind.QuickFix, CodeActionKind.RefactorRewrite)
+            CodeActionKinds = new Container<CodeActionKind>(CodeActionKind.QuickFix, CodeActionKind.RefactorRewrite, CodeActionKind.SourceFixAll)
         };
 
     public void SetCapability(CodeActionCapability capability)
@@ -68,13 +68,25 @@ internal sealed class CodeActionHandler : ICodeActionHandler
             var supportsRefactorRewrite = SupportsKind(request.Context?.Only, CodeActionKind.RefactorRewrite);
             var refactorRewriteExplicitlyRequested = IsKindExplicitlyRequested(request.Context?.Only, CodeActionKind.RefactorRewrite);
             var supportsQuickFix = SupportsKind(request.Context?.Only, CodeActionKind.QuickFix);
+            var supportsFixAll = SupportsKind(request.Context?.Only, CodeActionKind.SourceFixAll);
+            var fixAllExplicitlyRequested = IsKindExplicitlyRequested(request.Context?.Only, CodeActionKind.SourceFixAll);
 
-            var filteredFixes = supportsQuickFix
+            var filteredFixes = supportsQuickFix || supportsFixAll
                 ? GetQuickFixesForRequest(request, documentText, syntaxTree, cancellationToken)
                     .Where(fix => IsFixInRequestedRange(fix, request.Range, documentText))
                     .Where(fix => MatchesRequestedDiagnostics(fix, request.Context?.Diagnostics, documentText))
                     .ToArray()
                 : [];
+            var fixAllCandidates = filteredFixes;
+            if (supportsFixAll &&
+                fixAllExplicitlyRequested &&
+                _workspaceManager.TryGetCodeFixes(
+                    request.TextDocument.Uri,
+                    out var documentFixes,
+                    cancellationToken: cancellationToken))
+            {
+                fixAllCandidates = documentFixes.ToArray();
+            }
             var filteredRefactorings =
                 supportsRefactorRewrite &&
                 _workspaceManager.TryGetRefactorings(request.TextDocument.Uri, selectionSpan, out var refactorings, cancellationToken)
@@ -139,6 +151,46 @@ internal sealed class CodeActionHandler : ICodeActionHandler
                         if (preview is not null)
                             actions.Add(preview);
                     }
+                }
+            }
+
+            if (supportsFixAll)
+            {
+                var seenFixAllActions = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var fix in fixAllCandidates)
+                {
+                    var equivalenceKey = fix.Action.EquivalenceKey;
+                    if (string.IsNullOrWhiteSpace(equivalenceKey) ||
+                        !seenFixAllActions.Add($"{fix.Provider.GetType().AssemblyQualifiedName}|{equivalenceKey}"))
+                    {
+                        continue;
+                    }
+
+                    if (!_workspaceManager.TryGetFixAll(
+                            request.TextDocument.Uri,
+                            fix,
+                            FixAllScope.Document,
+                            out var fixAllAction,
+                            cancellationToken) ||
+                        fixAllAction is null)
+                    {
+                        continue;
+                    }
+
+                    var titledAction = CodeFixAction.Create(
+                        $"Fix all in document: {fix.Action.Title}",
+                        fixAllAction.GetChangedSolution,
+                        equivalenceKey);
+                    var action = await TryCreateLspCodeActionAsync(
+                        request.TextDocument.Uri,
+                        document,
+                        fix.DocumentId,
+                        titledAction,
+                        CodeActionKind.SourceFixAll,
+                        diagnostic: null,
+                        cancellationToken).ConfigureAwait(false);
+                    if (action is not null)
+                        actions.Add(action);
                 }
             }
 

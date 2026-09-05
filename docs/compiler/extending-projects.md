@@ -124,6 +124,44 @@ diagnostic output.
 External analyzers should use a stable diagnostic prefix owned by the
 extension. The `RAV` prefix is reserved for Raven's built-in diagnostics.
 
+## Pair diagnostics with code fixes
+
+A `CodeFixProvider` can register one or more corrections for diagnostics from
+an analyzer or the compiler. Give each action a stable, non-empty equivalence
+key when the same correction can be applied to every matching diagnostic. The
+title may describe the current occurrence; the equivalence key identifies the
+operation across occurrences.
+
+Override `GetFixAllProvider` to opt into Fix All. Raven's built-in batch fixer
+supports document, project, and solution scopes:
+
+```raven
+class AvoidLegacyApiCodeFixProvider : CodeFixProvider {
+    override val FixableDiagnosticIds: IEnumerable<string> => ["APP001"]
+
+    override func GetFixAllProvider() -> FixAllProvider =>
+        WellKnownFixAllProviders.BatchFixer
+
+    override func RegisterCodeFixes(context: CodeFixContext) {
+        context.RegisterCodeFix(CodeAction.CreateTextChange(
+            "Use CurrentApi",
+            context.Document.Id,
+            TextChange(context.Diagnostic.Location.SourceSpan, "CurrentApi"),
+            "AvoidLegacyApi.UseCurrentApi"))
+    }
+}
+```
+
+The batch fixer computes every equivalent action from the original solution
+snapshot, merges non-overlapping edits, and skips conflicting actions. It
+currently batches text changes to existing documents. A provider that needs to
+coordinate overlapping edits or add and remove documents can supply its own
+`FixAllProvider`.
+
+The language server exposes document-scoped actions through the standard
+`source.fixAll` code-action kind. Hosts using the workspace API can request all
+three scopes with `Workspace.GetFixAll`.
+
 ## Generate additional source
 
 A source generator implements `ISourceGenerator`. Its execution context

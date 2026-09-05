@@ -7,6 +7,8 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class RemoveRedundantImportCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(RemoveRedundantImportCodeFixProvider);
+
     private static readonly ImmutableArray<string> FixableIds =
     [
         CompilerDiagnostics.ImportDirectiveRedundantWithGlobalImport.Id,
@@ -14,6 +16,8 @@ public sealed class RemoveRedundantImportCodeFixProvider : CodeFixProvider
     ];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -62,7 +66,8 @@ public sealed class RemoveRedundantImportCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Remove redundant import",
                 context.Document.Id,
-                new TextChange(removalSpan, string.Empty)));
+                new TextChange(removalSpan, string.Empty),
+                EquivalenceKey));
     }
 
     private static IEnumerable<TextSpan> GetRedundantImportRemovalSpans(

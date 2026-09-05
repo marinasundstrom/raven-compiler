@@ -6,9 +6,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class MemberCanBePrivateCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(MemberCanBePrivateCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [MemberCanBePrivateAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -37,6 +40,7 @@ public sealed class MemberCanBePrivateCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Make member private",
                 context.Document.Id,
-                change.Value));
+                change.Value,
+                EquivalenceKey));
     }
 }

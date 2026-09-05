@@ -61,7 +61,7 @@ public sealed class GeneratorExecutionContext
             .Select(item => new GeneratedSourceResult(
                 item.Key,
                 item.Value,
-                Syntax.SyntaxTree.ParseText(
+                Syntax.SyntaxTree.ParseGeneratedText(
                     item.Value,
                     path: Path.Combine(outputPath ?? "generated", SanitizePathSegment(generatorName), item.Key))))
             .ToImmutableArray();

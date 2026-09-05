@@ -7,6 +7,9 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class ConversionCastCodeFixProvider : CodeFixProvider
 {
+    private const string AddCastEquivalenceKey = nameof(ConversionCastCodeFixProvider) + ".AddCast";
+    private const string RemoveCastEquivalenceKey = nameof(ConversionCastCodeFixProvider) + ".RemoveCast";
+
     private static readonly ImmutableArray<string> FixableIds =
     [
         CompilerDiagnostics.ExplicitConversionExists.Id,
@@ -14,6 +17,8 @@ public sealed class ConversionCastCodeFixProvider : CodeFixProvider
     ];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -53,7 +58,8 @@ public sealed class ConversionCastCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 $"Add explicit cast to '{targetType}'",
                 context.Document.Id,
-                change));
+                change,
+                $"{AddCastEquivalenceKey}:{targetType}"));
     }
 
     private static void RegisterRemoveRedundantCastFix(CodeFixContext context, Diagnostic diagnostic)
@@ -75,7 +81,8 @@ public sealed class ConversionCastCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Remove redundant explicit cast",
                 context.Document.Id,
-                change));
+                change,
+                RemoveCastEquivalenceKey));
     }
 
     private static ExpressionSyntax? FindExpressionAtDiagnostic(SyntaxNode root, TextSpan span)

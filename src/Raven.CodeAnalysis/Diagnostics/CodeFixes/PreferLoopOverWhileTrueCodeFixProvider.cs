@@ -7,9 +7,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class PreferLoopOverWhileTrueCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(PreferLoopOverWhileTrueCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [PreferLoopOverWhileTrueAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -39,6 +42,7 @@ public sealed class PreferLoopOverWhileTrueCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Replace 'while true' with 'loop'",
                 context.Document.Id,
-                new TextChange(headerSpan, "loop")));
+                new TextChange(headerSpan, "loop"),
+                EquivalenceKey));
     }
 }

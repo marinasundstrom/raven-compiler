@@ -4,7 +4,62 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ## Unreleased
 
+### Added
+
+- Added Roslyn-shaped Fix All support with document, project, and solution
+  scopes, stable code-action equivalence keys, and a reusable batch provider
+  that merges non-overlapping text changes.
+- All built-in code-fix providers now opt into Fix All where they offer a
+  repeatable correction, and the language server exposes document-wide fixes
+  through the standard `source.fixAll` action.
+
+- `.editorconfig` supports per-file `generated_code = true` or `false` analyzer
+  classification, including live updates in the language server.
+- Generated-code analyzer policies now recognize `GeneratedCodeAttribute` on
+  source types and members, including callbacks and location-based reporting.
+- Generated-code analyzer policies recognize conventional generated file names and
+  leading auto-generated comments, with classification refreshed after header edits.
+
+- Analyzers can configure source-generated tree callbacks and diagnostic reporting
+  independently with `ConfigureGeneratedCodeAnalysis` and `GeneratedCodeAnalysisFlags`.
+  Unconfigured analyzers retain the existing analyze-and-report behavior.
+
 ### Fixed
+
+- Opening a source file in a nested project omitted from the workspace solution
+  now loads its containing project on demand, restoring sibling type lookup
+  while respecting evaluated compile exclusions.
+
+- Namespace function accessibility validation now tolerates parser recovery
+  tokens in parameter lists, preserving diagnostics after local-symbol queries
+  in malformed async-lambda code.
+
+- Background project analyzer diagnostics skip busy semantic models and retry
+  without caching an incomplete result, preventing waits behind editor requests.
+- Releasing asynchronous semantic access no longer corrupts the caller's lock
+  depth, preventing subsequent diagnostics from blocking after editor queries.
+
+- Read-only source-generator documents now show compiler and analyzer diagnostics
+  from the current project compilation and refresh them after source edits.
+
+- Project analyzer diagnostics now include source-generated syntax trees, honor
+  suppression directives in those files, and retry failed generated-tree analysis.
+
+- Public workspace diagnostics now retry failed analyzer runs instead of caching
+  partial results, matching the recovery behavior of editor analysis.
+
+- Incomplete document and project analyzer runs are no longer cached or published
+  as successful empty results. The editor preserves previous analyzer warnings
+  through failures and cancellation, then replaces them after a successful retry.
+- Analyzer diagnostics carry their origin into the language server, so external
+  analyzer warnings survive compiler-only diagnostic refreshes too.
+
+- Analyzer failure logs identify the analyzer, callback phase, exception, and
+  affected document, including initialization failures. Repeated failures are
+  counted without flooding logs, and incomplete runs are labeled explicitly.
+
+- Retrying failed or canceled analyzer initialization no longer duplicates
+  callbacks or retains concurrency settings from the unsuccessful attempt.
 
 - Go to Definition opens source-generator output as a read-only, live Raven
   document, including hover and navigation back to handwritten source, without

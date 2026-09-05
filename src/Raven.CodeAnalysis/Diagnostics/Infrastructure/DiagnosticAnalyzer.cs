@@ -13,21 +13,25 @@ namespace Raven.CodeAnalysis.Diagnostics;
 public abstract class DiagnosticAnalyzer
 {
     private readonly object _initializationGate = new();
-    private bool _initialized;
+    private volatile bool _initialized;
     private readonly List<Action<CompilationAnalysisContext>> _compilationActions = new();
     private readonly List<Action<SyntaxTreeAnalysisContext>> _syntaxTreeActions = new();
     private readonly List<SymbolActionRegistration> _symbolActions = new();
     private readonly List<SyntaxNodeActionRegistration> _syntaxNodeActions = new();
     private readonly List<OperationActionRegistration> _operationActions = new();
     private bool _concurrentExecutionEnabled;
+    private GeneratedCodeAnalysisFlags _generatedCodeAnalysis;
 
     /// <summary>Implement to register analysis actions.</summary>
     public abstract void Initialize(AnalysisContext context);
 
     public virtual ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [];
 
-    internal bool TryEnsureInitialized()
+    internal bool TryEnsureInitialized() => TryEnsureInitialized(out _);
+
+    internal bool TryEnsureInitialized(out Exception? initializationException)
     {
+        initializationException = null;
         if (_initialized)
             return true;
 
@@ -38,13 +42,30 @@ public abstract class DiagnosticAnalyzer
 
             try
             {
+                // Publish registrations only after initialization succeeds. A failed or
+                // canceled attempt must not leave callbacks or concurrency settings behind.
+                var compilationActions = new List<Action<CompilationAnalysisContext>>();
+                var syntaxTreeActions = new List<Action<SyntaxTreeAnalysisContext>>();
+                var symbolActions = new List<SymbolActionRegistration>();
+                var syntaxNodeActions = new List<SyntaxNodeActionRegistration>();
+                var operationActions = new List<OperationActionRegistration>();
+                var concurrentExecutionEnabled = false;
+                var generatedCodeAnalysis = GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics;
                 Initialize(new AnalysisContext(
-                    _compilationActions,
-                    _syntaxTreeActions,
-                    _symbolActions,
-                    _syntaxNodeActions,
-                    _operationActions,
-                    () => _concurrentExecutionEnabled = true));
+                    compilationActions,
+                    syntaxTreeActions,
+                    symbolActions,
+                    syntaxNodeActions,
+                    operationActions,
+                    () => concurrentExecutionEnabled = true,
+                    flags => generatedCodeAnalysis = flags));
+                _compilationActions.AddRange(compilationActions);
+                _syntaxTreeActions.AddRange(syntaxTreeActions);
+                _symbolActions.AddRange(symbolActions);
+                _syntaxNodeActions.AddRange(syntaxNodeActions);
+                _operationActions.AddRange(operationActions);
+                _concurrentExecutionEnabled = concurrentExecutionEnabled;
+                _generatedCodeAnalysis = generatedCodeAnalysis;
                 _initialized = true;
                 return true;
             }
@@ -52,8 +73,9 @@ public abstract class DiagnosticAnalyzer
             {
                 throw;
             }
-            catch
+            catch (Exception exception)
             {
+                initializationException = exception;
                 return false;
             }
         }
@@ -71,17 +93,56 @@ public abstract class DiagnosticAnalyzer
 
     internal bool ConcurrentExecutionEnabled => _concurrentExecutionEnabled;
 
+    internal bool ShouldAnalyzeTree(SyntaxTree tree, Compilation compilation)
+        => !IsGeneratedTree(tree, compilation) || (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0;
+
+    internal bool ShouldAnalyzeSymbol(ISymbol symbol)
+        => (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0 || !IsGeneratedSymbol(symbol);
+
+    internal bool ShouldAnalyzeNode(SyntaxNode node, SemanticModel semanticModel)
+        => (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0 ||
+            !IsWithinGeneratedSymbol(node, semanticModel);
+
+    internal bool ShouldReportDiagnostic(Diagnostic diagnostic, Compilation compilation)
+    {
+        if ((_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.ReportDiagnostics) != 0)
+            return true;
+
+        var tree = diagnostic.Location.SourceTree;
+        if (tree is null)
+            return true;
+        if (IsGeneratedTree(tree, compilation))
+            return false;
+
+        var span = diagnostic.Location.SourceSpan;
+        if (span.Start < 0 || span.Start >= tree.Length)
+            return true;
+
+        var node = tree.GetRoot().FindToken(span.Start).Parent;
+        return node is null || !IsWithinGeneratedSymbol(node, compilation.GetSemanticModel(tree));
+    }
+
     /// <summary>Runs the analyzer for the specified compilation.</summary>
     public IEnumerable<Diagnostic> Analyze(Compilation compilation, CancellationToken cancellationToken = default)
         => Analyze(compilation, syntaxTree: null, cancellationToken);
 
     /// <summary>Runs the analyzer for the specified syntax tree in the compilation.</summary>
     public IEnumerable<Diagnostic> Analyze(Compilation compilation, SyntaxTree? syntaxTree, CancellationToken cancellationToken = default)
-    {
-        if (!TryEnsureInitialized())
-            return [];
+        => AnalyzeWithResult(compilation, syntaxTree, cancellationToken).Diagnostics;
 
+    internal AnalyzerDiagnosticsResult AnalyzeWithResult(Compilation compilation, SyntaxTree? syntaxTree, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryEnsureInitialized())
+            return new([], Succeeded: false);
+
+        var succeeded = true;
         var diagnostics = new List<Diagnostic>();
+        void ReportDiagnostic(Diagnostic diagnostic)
+        {
+            if (ShouldReportDiagnostic(diagnostic, compilation))
+                diagnostics.Add(diagnostic);
+        }
         var syntaxTrees = syntaxTree is null
             ? compilation.SyntaxTrees
             : [syntaxTree];
@@ -91,7 +152,7 @@ public abstract class DiagnosticAnalyzer
             var compilationContext = new CompilationAnalysisContext(
                 compilation,
                 syntaxTree,
-                diagnostics.Add,
+                ReportDiagnostic,
                 cancellationToken);
 
             try
@@ -104,13 +165,16 @@ public abstract class DiagnosticAnalyzer
             }
             catch
             {
+                succeeded = false;
                 // Analyzer failures should not stop compilation.
             }
         }
 
         foreach (var tree in syntaxTrees)
         {
-            var treeContext = new SyntaxTreeAnalysisContext(tree, compilation, diagnostics.Add, cancellationToken);
+            if (!ShouldAnalyzeTree(tree, compilation))
+                continue;
+            var treeContext = new SyntaxTreeAnalysisContext(tree, compilation, ReportDiagnostic, cancellationToken);
             foreach (var action in _syntaxTreeActions)
             {
                 try
@@ -123,6 +187,7 @@ public abstract class DiagnosticAnalyzer
                 }
                 catch
                 {
+                    succeeded = false;
                     // Analyzer failures should not stop compilation.
                 }
             }
@@ -132,6 +197,9 @@ public abstract class DiagnosticAnalyzer
                 var symbolSemanticModel = compilation.GetSemanticModel(tree);
                 foreach (var symbol in AnalyzerSymbolEnumerator.EnumerateSymbols(tree, symbolSemanticModel, GetRegisteredSymbolKinds(), cancellationToken))
                 {
+                    if (!ShouldAnalyzeSymbol(symbol))
+                        continue;
+
                     foreach (var registration in _symbolActions)
                     {
                         if (!registration.Kinds.Contains(symbol.Kind))
@@ -140,7 +208,7 @@ public abstract class DiagnosticAnalyzer
                         var symbolContext = new SymbolAnalysisContext(
                             symbol,
                             compilation,
-                            diagnostics.Add,
+                            ReportDiagnostic,
                             cancellationToken);
 
                         try
@@ -153,6 +221,7 @@ public abstract class DiagnosticAnalyzer
                         }
                         catch
                         {
+                            succeeded = false;
                             // Analyzer failures should not stop compilation.
                         }
                     }
@@ -168,6 +237,9 @@ public abstract class DiagnosticAnalyzer
 
                 foreach (var node in root.DescendantNodesAndSelf())
                 {
+                    if (!ShouldAnalyzeNode(node, semanticModel))
+                        continue;
+
                     for (var i = 0; i < _syntaxNodeActions.Count; i++)
                     {
                         var registration = _syntaxNodeActions[i];
@@ -178,7 +250,7 @@ public abstract class DiagnosticAnalyzer
                             node,
                             semanticModel,
                             compilation,
-                            diagnostics.Add,
+                            ReportDiagnostic,
                             cancellationToken);
 
                         try
@@ -191,6 +263,7 @@ public abstract class DiagnosticAnalyzer
                         }
                         catch
                         {
+                            succeeded = false;
                             // Analyzer failures should not stop compilation.
                         }
                     }
@@ -207,6 +280,9 @@ public abstract class DiagnosticAnalyzer
                          GetRegisteredOperationKinds(),
                          cancellationToken))
             {
+                if (!ShouldAnalyzeNode(operation.Syntax, semanticModel))
+                    continue;
+
                 foreach (var registration in _operationActions)
                 {
                     if (!registration.Kinds.Contains(operation.Kind))
@@ -216,7 +292,7 @@ public abstract class DiagnosticAnalyzer
                         operation,
                         semanticModel,
                         compilation,
-                        diagnostics.Add,
+                        ReportDiagnostic,
                         cancellationToken);
 
                     try
@@ -229,13 +305,17 @@ public abstract class DiagnosticAnalyzer
                     }
                     catch
                     {
+                        succeeded = false;
                         // Analyzer failures should not stop compilation.
                     }
                 }
             }
         }
 
-        return diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance);
+        return new AnalyzerDiagnosticsResult(
+            diagnostics.Select(diagnostic => AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, this))
+                .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray(),
+            succeeded);
 
         ImmutableHashSet<SymbolKind> GetRegisteredSymbolKinds()
             => _symbolActions
@@ -246,6 +326,45 @@ public abstract class DiagnosticAnalyzer
             => _operationActions
                 .SelectMany(static action => action.Kinds)
                 .ToImmutableHashSet();
+    }
+
+    private static bool IsWithinGeneratedSymbol(SyntaxNode node, SemanticModel semanticModel)
+    {
+        foreach (var candidate in node.AncestorsAndSelf())
+        {
+            if (candidate is not (MemberDeclarationSyntax or FunctionStatementSyntax))
+                continue;
+            if (semanticModel.GetDeclaredSymbol(candidate) is { } symbol)
+                return IsGeneratedSymbol(symbol);
+        }
+        return false;
+    }
+
+    private static bool IsGeneratedTree(SyntaxTree tree, Compilation compilation)
+    {
+        if (!string.IsNullOrWhiteSpace(tree.FilePath))
+        {
+            var path = Path.GetFullPath(tree.FilePath);
+            if (compilation.Options.GeneratedCodeOptions.TryGetValue(path, out var configured))
+                return configured;
+        }
+
+        return tree.IsGeneratedCode;
+    }
+
+    private static bool IsGeneratedSymbol(ISymbol symbol)
+    {
+        for (var current = symbol; current is not null; current = current.ContainingSymbol)
+        {
+            if (current.Kind == SymbolKind.Namespace)
+                continue;
+            if (current.DeclaringSyntaxReferences.Length > 1)
+                return false;
+            if (current.GetAttributes().Any(static attribute =>
+                    attribute.AttributeClass.ToFullyQualifiedMetadataName() == "System.CodeDom.Compiler.GeneratedCodeAttribute"))
+                return true;
+        }
+        return false;
     }
 }
 
@@ -281,6 +400,7 @@ public sealed class AnalysisContext
     private readonly List<SyntaxNodeActionRegistration> _syntaxNodeActions;
     private readonly List<OperationActionRegistration> _operationActions;
     private readonly Action _enableConcurrentExecution;
+    private readonly Action<GeneratedCodeAnalysisFlags> _configureGeneratedCodeAnalysis;
 
     internal AnalysisContext(
         List<Action<CompilationAnalysisContext>> compilationActions,
@@ -288,7 +408,8 @@ public sealed class AnalysisContext
         List<SymbolActionRegistration> symbolActions,
         List<SyntaxNodeActionRegistration> syntaxNodeActions,
         List<OperationActionRegistration> operationActions,
-        Action enableConcurrentExecution)
+        Action enableConcurrentExecution,
+        Action<GeneratedCodeAnalysisFlags> configureGeneratedCodeAnalysis)
     {
         _compilationActions = compilationActions;
         _syntaxTreeActions = syntaxTreeActions;
@@ -296,6 +417,7 @@ public sealed class AnalysisContext
         _syntaxNodeActions = syntaxNodeActions;
         _operationActions = operationActions;
         _enableConcurrentExecution = enableConcurrentExecution;
+        _configureGeneratedCodeAnalysis = configureGeneratedCodeAnalysis;
     }
 
     /// <summary>
@@ -304,6 +426,10 @@ public sealed class AnalysisContext
     /// </summary>
     public void EnableConcurrentExecution()
         => _enableConcurrentExecution();
+
+    /// <summary>Configures callbacks and reporting for source-generated trees. The default enables both.</summary>
+    public void ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags analysisMode)
+        => _configureGeneratedCodeAnalysis(analysisMode);
 
     /// <summary>Registers an action executed once for the compilation being analyzed.</summary>
     public void RegisterCompilationAction(Action<CompilationAnalysisContext> action)

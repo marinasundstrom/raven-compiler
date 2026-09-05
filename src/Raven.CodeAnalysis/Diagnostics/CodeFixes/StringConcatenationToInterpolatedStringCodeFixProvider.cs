@@ -8,10 +8,13 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class StringConcatenationToInterpolatedStringCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(StringConcatenationToInterpolatedStringCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds =
         [StringConcatenationAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -67,7 +70,8 @@ public sealed class StringConcatenationToInterpolatedStringCodeFixProvider : Cod
             CodeAction.CreateTextChange(
                 "Convert to interpolated string",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 
     internal static InfixOperatorExpressionSyntax GetTopmostConcat(InfixOperatorExpressionSyntax expr)

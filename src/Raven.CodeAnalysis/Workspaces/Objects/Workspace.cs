@@ -485,6 +485,7 @@ public class Workspace
             return cachedDiagnostics;
         }
 
+        var succeeded = true;
         var diagnostics = compilation.GetDiagnostics(analyzerOptions, cancellationToken).ToHashSet();
 
         if (project.CompilationOptions?.RunAnalyzers != false)
@@ -504,7 +505,9 @@ public class Workspace
                     IEnumerable<Diagnostic> analyzerDiagnostics;
                     try
                     {
-                        analyzerDiagnostics = analyzer.Analyze(compilation, cancellationToken);
+                        var analyzerResult = analyzer.AnalyzeWithResult(compilation, syntaxTree: null, cancellationToken);
+                        succeeded &= analyzerResult.Succeeded;
+                        analyzerDiagnostics = analyzerResult.Diagnostics;
                     }
                     catch (OperationCanceledException)
                     {
@@ -512,6 +515,7 @@ public class Workspace
                     }
                     catch
                     {
+                        succeeded = false;
                         // Analyzer failures should not stop normal compilation diagnostics.
                         continue;
                     }
@@ -530,7 +534,7 @@ public class Workspace
         }
 
         var result = diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray();
-        if (analyzerOptions is null)
+        if (succeeded && analyzerOptions is null)
             _projectDiagnosticsCache[cacheKey] = result;
 
         return result;
@@ -546,7 +550,7 @@ public class Workspace
             ?? throw new ArgumentException("Project not found", nameof(projectId));
 
         var compilation = CreateAnalysisCompilation(project, new HashSet<ProjectId>());
-        return GetProjectAnalyzerDiagnostics(project, compilation, analyzerOptions, cancellationToken);
+        return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken).Diagnostics;
     }
 
     internal ImmutableArray<Diagnostic> GetProjectAnalyzerDiagnostics(
@@ -554,6 +558,14 @@ public class Workspace
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
         CancellationToken cancellationToken = default)
+        => GetProjectAnalyzerResult(projectId, compilation, analyzerOptions, cancellationToken).Diagnostics;
+
+    internal AnalyzerDiagnosticsResult GetProjectAnalyzerResult(
+        ProjectId projectId,
+        Compilation compilation,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        CancellationToken cancellationToken = default,
+        bool allowBusySkip = false)
     {
         ArgumentNullException.ThrowIfNull(compilation);
 
@@ -561,14 +573,37 @@ public class Workspace
         var project = solution.GetProject(projectId)
             ?? throw new ArgumentException("Project not found", nameof(projectId));
 
-        return GetProjectAnalyzerDiagnostics(project, compilation, analyzerOptions, cancellationToken);
+        if (!allowBusySkip)
+            return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken);
+
+        var leases = new List<IDisposable>();
+        try
+        {
+            // Compiler diagnostics and analyzer callbacks can both enter semantic access.
+            // Reserve the project snapshot without waiting before either phase begins.
+            foreach (var tree in compilation.SyntaxTrees)
+            {
+                var lease = compilation.GetSemanticModel(tree).TryEnterSemanticAccess(cancellationToken);
+                if (lease is null)
+                    return new AnalyzerDiagnosticsResult([], Succeeded: false);
+                leases.Add(lease);
+            }
+
+            return GetProjectAnalyzerResult(project, compilation, analyzerOptions, cancellationToken, allowBusySkip: true);
+        }
+        finally
+        {
+            for (var i = leases.Count - 1; i >= 0; i--)
+                leases[i].Dispose();
+        }
     }
 
-    private ImmutableArray<Diagnostic> GetProjectAnalyzerDiagnostics(
+    private AnalyzerDiagnosticsResult GetProjectAnalyzerResult(
         Project project,
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowBusySkip = false)
     {
         var cacheKey = new ProjectAnalyzerDiagnosticsCacheKey(
             project.Id,
@@ -583,7 +618,7 @@ public class Workspace
                 project.FilePath,
                 0,
                 $"diagnostics={cachedDiagnostics.Length}"));
-            return cachedDiagnostics;
+            return new(cachedDiagnostics, Succeeded: true);
         }
 
         var timestamp = Stopwatch.GetTimestamp();
@@ -595,6 +630,7 @@ public class Workspace
             $"projectVersion={project.Version}"));
 
         var diagnostics = new HashSet<Diagnostic>();
+        var succeeded = true;
         AddDiagnostics(
             diagnostics,
             compilation.GetDiagnostics(analyzerOptions, cancellationToken),
@@ -602,32 +638,45 @@ public class Workspace
 
         if (project.CompilationOptions?.RunAnalyzers != false)
         {
-            RunProjectCompilationAnalyzerActions(
+            succeeded = RunProjectCompilationAnalyzerActions(
                 project,
                 compilation,
                 diagnostics,
                 analyzerOptions,
                 cancellationToken);
 
+            var analyzedTrees = new HashSet<SyntaxTree>(ReferenceEqualityComparer.Instance);
             foreach (var document in project.Documents.OrderBy(static document => document.FilePath, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                AddDiagnostics(
-                    diagnostics,
-                    GetDocumentAnalyzerDiagnostics(
-                        document,
-                        compilation,
-                        analyzerOptions,
-                        allowBusySkip: false,
-                        semanticAccessAlreadyHeld: false,
-                        cancellationToken),
-                    cancellationToken);
+                analyzedTrees.UnionWith(GetCompilationSyntaxTrees(document, compilation));
+                var documentResult = GetDocumentAnalyzerResult(document, compilation, analyzerOptions,
+                    allowBusySkip: allowBusySkip, semanticAccessAlreadyHeld: false, cancellationToken);
+                succeeded &= documentResult.Succeeded;
+                AddDiagnostics(diagnostics, documentResult.Diagnostics, cancellationToken);
+            }
+
+            // Generated trees belong to the compilation but have no authored workspace document.
+            foreach (var tree in compilation.SyntaxTrees)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!analyzedTrees.Add(tree))
+                    continue;
+
+                var treeResult = DocumentAnalyzerDriver.RunWithResult(
+                    project, tree, compilation, analyzerOptions, Services.WorkspaceEventSink, cancellationToken,
+                    allowBusySkip: allowBusySkip);
+                succeeded &= treeResult.Succeeded;
+                AddDiagnostics(diagnostics, treeResult.Diagnostics, cancellationToken);
             }
         }
 
         var result = diagnostics
             .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance)
             .ToImmutableArray();
+        if (!succeeded)
+            return new(result, Succeeded: false);
+
         _projectAnalyzerDiagnosticsCache[cacheKey] = result;
 
         Services.WorkspaceEventSink?.Report(new WorkspaceEvent(
@@ -637,16 +686,17 @@ public class Workspace
             Stopwatch.GetElapsedTime(timestamp).TotalMilliseconds,
             $"diagnostics={result.Length}"));
 
-        return result;
+        return new(result, Succeeded: true);
     }
 
-    private void RunProjectCompilationAnalyzerActions(
+    private bool RunProjectCompilationAnalyzerActions(
         Project project,
         Compilation compilation,
         HashSet<Diagnostic> diagnostics,
         CompilationWithAnalyzersOptions? analyzerOptions,
         CancellationToken cancellationToken)
     {
+        var succeeded = true;
         foreach (var reference in project.AnalyzerReferences)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -655,12 +705,18 @@ public class Workspace
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!ShouldRunAnalyzer(analyzer, project.CompilationOptions, analyzerOptions) ||
-                    !analyzer.TryEnsureInitialized() ||
-                    analyzer.CompilationActions.Count == 0)
+                if (!ShouldRunAnalyzer(analyzer, project.CompilationOptions, analyzerOptions))
                 {
                     continue;
                 }
+
+                if (!analyzer.TryEnsureInitialized())
+                {
+                    succeeded = false;
+                    continue;
+                }
+                if (analyzer.CompilationActions.Count == 0)
+                    continue;
 
                 var analyzerTimestamp = Stopwatch.GetTimestamp();
                 var analyzerName = analyzer.GetType().FullName ?? analyzer.GetType().Name;
@@ -669,10 +725,12 @@ public class Workspace
 
                 void ReportDiagnostic(Diagnostic diagnostic)
                 {
+                    if (!analyzer.ShouldReportDiagnostic(diagnostic, compilation))
+                        return;
                     AnalyzerDiagnosticIdValidator.Validate(analyzer, diagnostic, isInternalAnalyzer);
 
                     var mapped = compilation.ApplyCompilationOptions(
-                        diagnostic,
+                        AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, analyzer),
                         analyzerOptions?.ReportSuppressedDiagnostics ?? false,
                         cancellationToken);
                     if (mapped is not null)
@@ -711,6 +769,7 @@ public class Workspace
                 }
                 catch (Exception ex)
                 {
+                    succeeded = false;
                     Services.WorkspaceEventSink?.Report(new WorkspaceEvent(
                         "projectAnalyzer.compilationAction",
                         project.Name,
@@ -720,6 +779,7 @@ public class Workspace
                 }
             }
         }
+        return succeeded;
     }
 
     private static void AddDiagnostics(
@@ -823,6 +883,13 @@ public class Workspace
         DocumentId documentId,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
         CancellationToken cancellationToken = default)
+        => GetDocumentAnalyzerResult(projectId, documentId, analyzerOptions, cancellationToken).Diagnostics;
+
+    internal AnalyzerDiagnosticsResult GetDocumentAnalyzerResult(
+        ProjectId projectId,
+        DocumentId documentId,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        CancellationToken cancellationToken = default)
     {
         var solution = CurrentSolution;
         var project = solution.GetProject(projectId)
@@ -835,7 +902,7 @@ public class Workspace
             ?? throw new InvalidOperationException("Document does not have a syntax tree.");
 
         if (project.CompilationOptions?.RunAnalyzers == false)
-            return [];
+            return new([], Succeeded: true);
 
         var compilation = CreateAnalysisCompilation(project, new HashSet<ProjectId>());
         var cacheKey = new DocumentAnalyzerDiagnosticsCacheKey(
@@ -853,7 +920,7 @@ public class Workspace
                 syntaxTree,
                 elapsedMilliseconds: 0,
                 $"diagnostics={cachedDiagnostics.Length}");
-            return cachedDiagnostics;
+            return new(cachedDiagnostics, Succeeded: true);
         }
 
         var cacheMissTimestamp = Stopwatch.GetTimestamp();
@@ -865,10 +932,10 @@ public class Workspace
             $"projectVersion={project.Version}, documentVersion={document.Version}, allowBusySkip=false");
 
         var compilationSyntaxTrees = GetCompilationSyntaxTrees(document, compilation);
-        ImmutableArray<Diagnostic> diagnostics;
+        AnalyzerDiagnosticsResult result;
         try
         {
-            diagnostics = GetDocumentAnalyzerDiagnostics(
+            result = GetDocumentAnalyzerResult(
                 project,
                 compilationSyntaxTrees,
                 compilation,
@@ -898,6 +965,10 @@ public class Workspace
             throw;
         }
 
+        if (!result.Succeeded)
+            return result;
+
+        var diagnostics = result.Diagnostics;
         _documentAnalyzerDiagnosticsCache[cacheKey] = diagnostics;
         ReportWorkspaceEvent(
             "documentAnalyzer.cacheStore",
@@ -905,10 +976,19 @@ public class Workspace
             syntaxTree,
             Stopwatch.GetElapsedTime(cacheMissTimestamp).TotalMilliseconds,
             $"diagnostics={diagnostics.Length}, allowBusySkip=false");
-        return diagnostics;
+        return result;
     }
 
     internal ImmutableArray<Diagnostic> GetDocumentAnalyzerDiagnostics(
+        Document document,
+        Compilation compilation,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        bool allowBusySkip = false,
+        bool semanticAccessAlreadyHeld = false,
+        CancellationToken cancellationToken = default)
+        => GetDocumentAnalyzerResult(document, compilation, analyzerOptions, allowBusySkip, semanticAccessAlreadyHeld, cancellationToken).Diagnostics;
+
+    internal AnalyzerDiagnosticsResult GetDocumentAnalyzerResult(
         Document document,
         Compilation compilation,
         CompilationWithAnalyzersOptions? analyzerOptions = null,
@@ -926,7 +1006,7 @@ public class Workspace
         var compilationSyntaxTree = compilationSyntaxTrees[0];
 
         if (document.Project.CompilationOptions?.RunAnalyzers == false)
-            return [];
+            return new([], Succeeded: true);
 
         var cacheKey = new DocumentAnalyzerDiagnosticsCacheKey(
             document.Project.Id,
@@ -943,7 +1023,7 @@ public class Workspace
                 compilationSyntaxTree,
                 elapsedMilliseconds: 0,
                 $"diagnostics={cachedDiagnostics.Length}");
-            return cachedDiagnostics;
+            return new(cachedDiagnostics, Succeeded: true);
         }
 
         var cacheMissTimestamp = Stopwatch.GetTimestamp();
@@ -954,10 +1034,10 @@ public class Workspace
             elapsedMilliseconds: 0,
             $"projectVersion={document.Project.Version}, documentVersion={document.Version}, allowBusySkip={allowBusySkip}");
 
-        ImmutableArray<Diagnostic> diagnostics;
+        AnalyzerDiagnosticsResult result;
         try
         {
-            diagnostics = GetDocumentAnalyzerDiagnostics(
+            result = GetDocumentAnalyzerResult(
                 document.Project,
                 compilationSyntaxTrees,
                 compilation,
@@ -987,6 +1067,10 @@ public class Workspace
             throw;
         }
 
+        if (!result.Succeeded)
+            return result;
+
+        var diagnostics = result.Diagnostics;
         _documentAnalyzerDiagnosticsCache[cacheKey] = diagnostics;
         ReportWorkspaceEvent(
             "documentAnalyzer.cacheStore",
@@ -994,10 +1078,10 @@ public class Workspace
             compilationSyntaxTree,
             Stopwatch.GetElapsedTime(cacheMissTimestamp).TotalMilliseconds,
             $"diagnostics={diagnostics.Length}, allowBusySkip={allowBusySkip}");
-        return diagnostics;
+        return result;
     }
 
-    private ImmutableArray<Diagnostic> GetDocumentAnalyzerDiagnostics(
+    private AnalyzerDiagnosticsResult GetDocumentAnalyzerResult(
         Project project,
         ImmutableArray<SyntaxTree> syntaxTrees,
         Compilation compilation,
@@ -1007,26 +1091,19 @@ public class Workspace
         CancellationToken cancellationToken)
     {
         var diagnostics = new HashSet<Diagnostic>();
+        var succeeded = true;
         foreach (var syntaxTree in syntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            AddDiagnostics(
-                diagnostics,
-                DocumentAnalyzerDriver.Run(
-                    project,
-                    syntaxTree,
-                    compilation,
-                    analyzerOptions,
-                    Services.WorkspaceEventSink,
-                    cancellationToken,
-                    allowBusySkip,
-                    semanticAccessAlreadyHeld && syntaxTrees.Length == 1),
-                cancellationToken);
+            var result = DocumentAnalyzerDriver.RunWithResult(
+                project, syntaxTree, compilation, analyzerOptions, Services.WorkspaceEventSink,
+                cancellationToken, allowBusySkip, semanticAccessAlreadyHeld && syntaxTrees.Length == 1);
+            succeeded &= result.Succeeded;
+            AddDiagnostics(diagnostics, result.Diagnostics, cancellationToken);
         }
 
-        return diagnostics
-            .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance)
-            .ToImmutableArray();
+        return new AnalyzerDiagnosticsResult(
+            diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray(), succeeded);
     }
 
     private static ImmutableArray<SyntaxTree> GetCompilationSyntaxTrees(
@@ -1245,6 +1322,75 @@ public class Workspace
             .OrderBy(x => x.Diagnostic.Location)
             .ThenBy(x => x.Action.Title, StringComparer.Ordinal)
             .ToImmutableArray();
+    }
+
+    /// <summary>Gets a Fix All action for equivalent fixes within the requested scope.</summary>
+    public CodeAction? GetFixAll(
+        ProjectId projectId,
+        CodeFixProvider provider,
+        FixAllScope scope,
+        string codeActionEquivalenceKey,
+        DocumentId? documentId = null,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (provider is null)
+            throw new ArgumentNullException(nameof(provider));
+        if (string.IsNullOrWhiteSpace(codeActionEquivalenceKey))
+            throw new ArgumentException("A Fix All action requires a non-empty equivalence key.", nameof(codeActionEquivalenceKey));
+
+        var solution = CurrentSolution;
+        var project = solution.GetProject(projectId)
+            ?? throw new ArgumentException("Project not found", nameof(projectId));
+        var document = documentId is { } requestedDocumentId
+            ? solution.GetDocument(requestedDocumentId)
+            : null;
+        if (scope == FixAllScope.Document && (document is null || document.Project.Id != projectId))
+            throw new ArgumentException("Document scope requires a document in the requested project.", nameof(documentId));
+
+        var fixAllProvider = provider.GetFixAllProvider();
+        if (fixAllProvider is null || !fixAllProvider.GetSupportedFixAllScopes().Contains(scope))
+            return null;
+
+        var supportedIds = fixAllProvider
+            .GetSupportedFixAllDiagnosticIds(provider)
+            .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        var supportsAllIds = supportedIds.Contains("*");
+        var diagnosticsByDocument = ImmutableDictionary.CreateBuilder<DocumentId, ImmutableArray<Diagnostic>>();
+        var projects = scope == FixAllScope.Solution ? solution.Projects : [project];
+
+        foreach (var candidateProject in projects)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var diagnostics = GetDiagnostics(candidateProject.Id, analyzerOptions, cancellationToken)
+                .Where(diagnostic => supportsAllIds || supportedIds.Contains(diagnostic.Id));
+            foreach (var diagnostic in diagnostics)
+            {
+                if (!TryGetDiagnosticDocument(candidateProject, diagnostic, out var diagnosticDocument))
+                    continue;
+                if (scope == FixAllScope.Document && diagnosticDocument.Id != document!.Id)
+                    continue;
+
+                diagnosticsByDocument[diagnosticDocument.Id] = diagnosticsByDocument.TryGetValue(diagnosticDocument.Id, out var existing)
+                    ? existing.Add(diagnostic)
+                    : [diagnostic];
+            }
+        }
+
+        if (diagnosticsByDocument.Count == 0)
+            return null;
+
+        return fixAllProvider.GetFixAsync(new FixAllContext(
+                solution,
+                project,
+                document,
+                provider,
+                scope,
+                codeActionEquivalenceKey,
+                diagnosticsByDocument.ToImmutable(),
+                cancellationToken))
+            .GetAwaiter()
+            .GetResult();
     }
 
     /// <summary>

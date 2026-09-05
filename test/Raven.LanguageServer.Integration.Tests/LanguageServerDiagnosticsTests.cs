@@ -1,5 +1,6 @@
 using System.Threading;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -22,6 +23,17 @@ public sealed class LanguageServerDiagnosticsTests : IDisposable
 {
     private const string ThisValueIsNotMutableDiagnosticId = "RAV0027";
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"raven-ls-diags-{Guid.NewGuid():N}");
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> _messages = new();
+        public string Messages => string.Join(Environment.NewLine, _messages);
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+            => _messages.Enqueue(formatter(state, exception) + (exception is null ? "" : Environment.NewLine + exception));
+    }
 
     private sealed class BlockingMethodSymbolAnalyzer : DiagnosticAnalyzer
     {
@@ -487,7 +499,9 @@ class C {
     }
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new UnusedParameterAnalyzer()))).ShouldBeTrue();
         var diagnostics = await store.GetDiagnosticsAsync(uri, CancellationToken.None);
 
         var diagnostic = diagnostics.Single(d => string.Equals(
@@ -537,7 +551,9 @@ class UiWindow {
 """;
         var updatedCode = code.Replace("        self.title = title\n", string.Empty, StringComparison.Ordinal);
 
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new UnusedParameterAnalyzer()))).ShouldBeTrue();
         var beforeDiagnostics = await store.GetDiagnosticsAsync(uri, CancellationToken.None);
 
         beforeDiagnostics.Any(diagnostic => string.Equals(
@@ -574,6 +590,15 @@ class UiWindow {
     public async Task TryGetDiagnosticsAsync_AfterNamespaceFunctionInvocationEdit_ReportsNoOverloadAsync()
     {
         Directory.CreateDirectory(_tempRoot);
+        Directory.CreateDirectory(Path.Combine(_tempRoot, "src"));
+        File.WriteAllText(Path.Combine(_tempRoot, "src", "main.rvn"), string.Empty);
+        File.WriteAllText(Path.Combine(_tempRoot, "src", "test.rvn"), string.Empty);
+        WriteProject(_tempRoot, "Shared", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <ItemGroup><Compile Include="src/**/*.rvn" /></ItemGroup>
+            </Project>
+            """);
 
         var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
         var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
@@ -656,6 +681,15 @@ public func A(x: int) -> int {
     public async Task TryGetDiagnosticsAsync_AfterCrossFileDeclarationEdit_RemovesNotInScopeDiagnosticAsync()
     {
         Directory.CreateDirectory(_tempRoot);
+        Directory.CreateDirectory(Path.Combine(_tempRoot, "src"));
+        File.WriteAllText(Path.Combine(_tempRoot, "src", "main.rvn"), string.Empty);
+        File.WriteAllText(Path.Combine(_tempRoot, "src", "test.rvn"), string.Empty);
+        WriteProject(_tempRoot, "Shared", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <ItemGroup><Compile Include="src/**/*.rvn" /></ItemGroup>
+            </Project>
+            """);
 
         var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
         var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
@@ -684,7 +718,7 @@ func Main() {
     test.Dispose()
 }
 """;
-        const string badDeclarationSyntax = """
+        const string incompleteDeclaration = """
 namespace Utilities
 
 import System.Console.*
@@ -698,11 +732,7 @@ func A(x: int) -> int {
 }
 
 func A(x: string) -> int {
-    42 + int.Parse(x
-}
-
-func Test2() -> IDisposable {
-    return default!
+    42 + int.Parse(x)
 }
 """;
         const string fixedDeclaration = """
@@ -727,7 +757,7 @@ func Test2() -> IDisposable {
 }
 """;
 
-        await store.UpsertDocumentAsync(testUri, badDeclarationSyntax);
+        await store.UpsertDocumentAsync(testUri, incompleteDeclaration);
         await store.UpsertDocumentAsync(mainUri, main);
 
         var initialDiagnostics = await store.TryGetDiagnosticsAsync(
@@ -811,7 +841,9 @@ class UiPanel {
 """;
         var updatedCode = code.Replace("        self.title = title\n", string.Empty, StringComparison.Ordinal);
 
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new UnusedParameterAnalyzer()))).ShouldBeTrue();
         var beforeResult = await store.TryGetDocumentWithAnalyzersDiagnosticsAsync(
             uri,
             shouldSkipWork: null,
@@ -931,7 +963,9 @@ class C {
     }
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new UnusedMethodAnalyzer()))).ShouldBeTrue();
         var diagnostics = await store.GetDiagnosticsAsync(uri, CancellationToken.None);
 
         diagnostics.Count(d => string.Equals(
@@ -1068,7 +1102,9 @@ func Main() -> () {
     count
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
 
         var firstAnalyzerResult = await store.TryGetDiagnosticsAsync(
             uri,
@@ -1124,7 +1160,9 @@ func Main() -> () {
     count
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
 
         var firstResult = await store.TryGetDiagnosticsAsync(
             uri,
@@ -1191,6 +1229,14 @@ func Main() -> () {
     public async Task TryGetDiagnosticsAsync_DocumentWithAnalyzersLane_DoesNotReuseStaleCompilerDiagnosticsAfterProjectChangeAsync()
     {
         Directory.CreateDirectory(_tempRoot);
+        File.WriteAllText(Path.Combine(_tempRoot, "main.rvn"), string.Empty);
+        File.WriteAllText(Path.Combine(_tempRoot, "test.rvn"), string.Empty);
+        WriteProject(_tempRoot, "Shared", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+              <ItemGroup><Compile Include="*.rvn" /></ItemGroup>
+            </Project>
+            """);
 
         var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
         var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
@@ -1214,7 +1260,9 @@ func Main() -> () {
     Test()
 }
 """;
-        await store.UpsertDocumentAsync(mainUri, mainCode);
+        var authoredDocument = await store.UpsertDocumentAsync(mainUri, mainCode);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
 
         var compilerResult = await store.TryGetDiagnosticsAsync(
             mainUri,
@@ -1226,10 +1274,12 @@ func Main() -> () {
             string.Equals(diagnostic.Code?.String, "RAV0103", StringComparison.Ordinal) &&
             diagnostic.Message.Contains("Test", StringComparison.Ordinal)).ShouldBeTrue();
 
-        await store.UpsertDocumentAsync(testUri, """
-func Test() -> () {
+        var addedDocument = await store.UpsertDocumentAsync(testUri, """
+public func Test() -> () {
 }
 """);
+
+        addedDocument.Project.Id.ShouldBe(authoredDocument.Project.Id);
 
         var analyzerResult = await store.TryGetDiagnosticsAsync(
             mainUri,
@@ -1313,7 +1363,9 @@ func Main() -> unit {
     count
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
         var result = await store.TryGetDiagnosticsAsync(
             uri,
             DocumentStore.DiagnosticLane.ProjectWithAnalyzers,
@@ -1442,7 +1494,8 @@ func Main(users: IQueryable<User>) {
             })
         });
 
-        var store = new DocumentStore(manager, NullLogger<DocumentStore>.Instance);
+        var logger = new RecordingLogger<DocumentStore>();
+        var store = new DocumentStore(manager, logger);
         var inlayHandler = new InlayHintHandler(store, NullLogger<InlayHintHandler>.Instance);
         var documentPath = Path.Combine(_tempRoot, "src", "main.rvn");
         var uri = DocumentUri.FromFileSystemPath(documentPath);
@@ -1461,7 +1514,7 @@ func Main() -> unit {
     })
 }
 
-func Accept(handler: func (RequestContext) -> Task<string>) -> unit { }
+func Accept(handler: RequestContext -> Task<string>) -> unit { }
 """;
         await store.UpsertDocumentAsync(uri, code);
         var sourceText = Raven.CodeAnalysis.Text.SourceText.From(code);
@@ -1477,7 +1530,7 @@ func Accept(handler: func (RequestContext) -> Task<string>) -> unit { }
             shouldSkipWork: null,
             cancellationToken: CancellationToken.None);
 
-        result.WasSkipped.ShouldBeFalse();
+        result.WasSkipped.ShouldBeFalse(logger.Messages);
         result.Diagnostics.ShouldNotContain(diagnostic =>
             diagnostic.Severity == LspDiagnosticSeverity.Error &&
             diagnostic.Message.Contains("'context' is not in scope", StringComparison.Ordinal));
@@ -1891,6 +1944,7 @@ func Test() {
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>App</AssemblyName>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
@@ -1946,6 +2000,7 @@ func Test() {
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>App</AssemblyName>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
@@ -2428,7 +2483,8 @@ union MyResult<T>(List<T> | int)
         File.Exists(documentPath).ShouldBeTrue();
 
         var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
-        var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
+        var logger = new RecordingLogger<WorkspaceManager>();
+        var manager = new WorkspaceManager(workspace, logger);
         manager.Initialize(new InitializeParams
         {
             WorkspaceFolders = new Container<WorkspaceFolder>(new WorkspaceFolder
@@ -2453,7 +2509,7 @@ union MyResult<T>(List<T> | int)
         diagnostics.Any(diagnostic =>
                 string.Equals(diagnostic.Code?.String, "RAV0103", StringComparison.Ordinal) &&
                 diagnostic.Message.Contains("'VehicleDbContext' is not in scope", StringComparison.Ordinal))
-            .ShouldBeFalse();
+            .ShouldBeFalse(logger.Messages);
     }
 
     [Fact]
@@ -3028,7 +3084,7 @@ record Person(
     }
 
     [Fact]
-    public async Task TryGetDiagnosticsAsync_ProjectWithAnalyzersLane_DoesNotRequireDocumentSemanticGateAsync()
+    public async Task TryGetDiagnosticsAsync_ProjectWithAnalyzersLane_SkipsBusyDocumentAndRetriesAsync()
     {
         Directory.CreateDirectory(_tempRoot);
 
@@ -3053,17 +3109,26 @@ func Main() -> () {
 """;
         await store.UpsertDocumentAsync(uri, code);
 
-        using var heldLease = await store.EnterDocumentSemanticAccessAsync(uri, CancellationToken.None, "test");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var heldLease = await store.EnterDocumentSemanticAccessAsync(uri, timeout.Token, "test");
         var diagnosticsTask = store.TryGetDiagnosticsAsync(
             uri,
             DocumentStore.DiagnosticLane.ProjectWithAnalyzers,
             shouldSkipWork: null,
-            cancellationToken: CancellationToken.None);
+            cancellationToken: timeout.Token);
 
         var completedTask = await Task.WhenAny(diagnosticsTask, Task.Delay(1000));
         completedTask.ShouldBe(diagnosticsTask);
 
         var result = await diagnosticsTask;
+        result.WasSkipped.ShouldBeTrue();
+        heldLease.Dispose();
+
+        result = await store.TryGetDiagnosticsAsync(
+            uri,
+            DocumentStore.DiagnosticLane.ProjectWithAnalyzers,
+            shouldSkipWork: null,
+            cancellationToken: timeout.Token);
         result.WasSkipped.ShouldBeFalse();
         result.Diagnostics.ShouldNotBeEmpty();
     }

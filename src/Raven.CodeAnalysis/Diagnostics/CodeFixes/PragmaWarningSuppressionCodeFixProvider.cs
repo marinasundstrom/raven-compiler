@@ -15,6 +15,8 @@ public sealed class PragmaWarningSuppressionCodeFixProvider : CodeFixProvider
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
 
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+
     public override void RegisterCodeFixes(CodeFixContext context)
     {
         var diagnostic = context.Diagnostic;
@@ -40,7 +42,8 @@ public sealed class PragmaWarningSuppressionCodeFixProvider : CodeFixProvider
 
                     var updatedText = document.Text.WithChange(new TextChange(new TextSpan(plan.InsertPosition, 0), plan.InsertText));
                     return solution.WithDocumentText(context.Document.Id, updatedText);
-                }));
+                },
+                $"{nameof(PragmaWarningSuppressionCodeFixProvider)}:{diagnostic.Id}"));
     }
 
     private static bool TryCreateInsertionPlan(string text, int position, string diagnosticId, out InsertionPlan plan)

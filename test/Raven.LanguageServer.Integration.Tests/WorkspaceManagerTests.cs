@@ -547,7 +547,7 @@ func Main() -> unit { }
     [Theory]
     [InlineData("sln")]
     [InlineData("slnx")]
-    public void Initialize_UsesSolutionToGroupWorkspaceProjects(string solutionFormat)
+    public async Task Initialize_UsesSolutionToGroupWorkspaceProjects(string solutionFormat)
     {
         Directory.CreateDirectory(_tempRoot);
         var appRoot = Path.Combine(_tempRoot, "app");
@@ -596,6 +596,55 @@ func Main() -> unit { }
         manager.GetProjectsSnapshot().Single().FilePath.ShouldBe(Path.Combine(appRoot, "App.rvnproj"));
         manager.TryGetDocument(DocumentUri.FromFileSystemPath(appSourcePath), out _).ShouldBeTrue();
         manager.TryGetDocument(DocumentUri.FromFileSystemPath(otherSourcePath), out _).ShouldBeFalse();
+
+        var document = await manager.UpsertDocumentAsync(
+            DocumentUri.FromFileSystemPath(otherSourcePath), "class OtherType");
+        document.Project.FilePath.ShouldBe(Path.Combine(otherRoot, "Other.rvnproj"));
+        manager.GetProjectsSnapshot().Count.ShouldBe(2);
+        var updated = await manager.UpsertDocumentAsync(
+            DocumentUri.FromFileSystemPath(otherSourcePath), "class OtherType { }");
+        updated.Project.Id.ShouldBe(document.Project.Id);
+        manager.GetProjectsSnapshot().Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task UpsertDocument_UnlistedContainingProject_RespectsCompileExclusions()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        _ = WriteProject(Path.Combine(_tempRoot, "app"), "App", """
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+</Project>
+""");
+        _ = WriteSolution(_tempRoot, "Workspace", "slnx", ("App", "app/App.rvnproj"));
+        var otherRoot = Path.Combine(_tempRoot, "other");
+        var projectPath = WriteProject(otherRoot, "Other", """
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="src/**/*.rvn" /></ItemGroup>
+</Project>
+""");
+        WriteRavenFile(Path.Combine(otherRoot, "src", "Included.rvn"), "class Included { }");
+        var excludedPath = Path.Combine(otherRoot, "Excluded.rvn");
+        WriteRavenFile(excludedPath, "class Excluded { }");
+        var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
+        var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
+        manager.Initialize(new InitializeParams
+        {
+            WorkspaceFolders = new Container<WorkspaceFolder>(new WorkspaceFolder
+            {
+                Name = "temp",
+                Uri = DocumentUri.FromFileSystemPath(_tempRoot)
+            })
+        });
+
+        var document = await manager.UpsertDocumentAsync(
+            DocumentUri.FromFileSystemPath(excludedPath), "class Excluded { }");
+        document.Project.Id.ShouldNotBe(GetProject(manager, projectPath).Id);
+        GetProject(manager, projectPath).Documents.ShouldNotContain(item => item.FilePath == excludedPath);
     }
 
     [Theory]
@@ -1811,6 +1860,83 @@ dotnet_diagnostic.RAV9034.severity = error
         project.Id.ShouldBe(projectId);
         project.CompilationOptions!.SpecificDiagnosticOptions[UnusedExpressionResultAnalyzer.DiagnosticId]
             .ShouldBe(ReportDiagnostic.Error);
+    }
+
+    [Fact]
+    public void ApplyEditorConfigDiagnosticOptionsForWatchedFileChanges_UpdatesGeneratedCodeWithoutReload()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        WriteProject(_tempRoot, "App", """
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="src/**/*.rvn" />
+  </ItemGroup>
+</Project>
+""");
+        var sourcePath = Path.Combine(_tempRoot, "src", "main.rvn");
+        WriteRavenFile(sourcePath, "func Main() -> unit { }");
+        var editorConfigPath = Path.Combine(_tempRoot, ".editorconfig");
+        File.WriteAllText(editorConfigPath, """
+root = true
+
+[*.rvn]
+generated_code = true
+""");
+
+        var projectSystem = new CountingProjectSystemService(new MsBuildProjectSystemService());
+        var workspace = RavenWorkspace.Create(targetFramework: "net10.0", projectSystemService: projectSystem);
+        var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
+        manager.Initialize(new InitializeParams
+        {
+            WorkspaceFolders = new Container<WorkspaceFolder>(new WorkspaceFolder
+            {
+                Name = "temp",
+                Uri = DocumentUri.FromFileSystemPath(_tempRoot)
+            })
+        });
+
+        projectSystem.OpenAttempts.ShouldBe(1);
+        var projectId = manager.GetProjectsSnapshot().Single().Id;
+        var analyzer = new GeneratedCodeOptOutAnalyzer();
+        var project = manager.GetProjectsSnapshot().Single()
+            .AddAnalyzerReference(new AnalyzerReference(analyzer));
+        workspace.TryApplyChanges(project.Solution).ShouldBeTrue();
+        workspace.GetDiagnostics(projectId).ShouldNotContain(diagnostic => diagnostic.Id == "AN9070");
+
+        File.WriteAllText(editorConfigPath, """
+root = true
+
+[*.rvn]
+generated_code = false
+""");
+
+        _ = manager.ApplyEditorConfigDiagnosticOptionsForWatchedFileChanges([
+            new FileEvent
+            {
+                Uri = DocumentUri.FromFileSystemPath(editorConfigPath),
+                Type = FileChangeType.Changed
+            }
+        ]);
+
+        projectSystem.OpenAttempts.ShouldBe(1);
+        manager.GetProjectsSnapshot().Single().Id.ShouldBe(projectId);
+        workspace.GetDiagnostics(projectId).ShouldContain(diagnostic => diagnostic.Id == "AN9070");
+    }
+
+    private sealed class GeneratedCodeOptOutAnalyzer : DiagnosticAnalyzer
+    {
+        private static readonly DiagnosticDescriptor Rule = DiagnosticDescriptor.Create(
+            "AN9070", "EditorConfig generated code", null, "", "EditorConfig generated code", "Testing", Raven.CodeAnalysis.DiagnosticSeverity.Warning);
+
+        public override void Initialize(AnalysisContext context)
+        {
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterSyntaxTreeAction(action =>
+                action.ReportDiagnostic(Raven.CodeAnalysis.Diagnostic.Create(Rule, Raven.CodeAnalysis.Location.None)));
+        }
     }
 
     [Fact]

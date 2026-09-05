@@ -8,10 +8,13 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class MergeStringLiteralConcatenationCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(MergeStringLiteralConcatenationCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds =
         [StringConcatenationAnalyzer.MergeDiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -59,7 +62,8 @@ public sealed class MergeStringLiteralConcatenationCodeFixProvider : CodeFixProv
             CodeAction.CreateTextChange(
                 "Merge string concatenation",
                 context.Document.Id,
-                new TextChange(concat.Span, replacement)));
+                new TextChange(concat.Span, replacement),
+                EquivalenceKey));
     }
 
     private static void FlattenConcat(ExpressionSyntax expression, List<ExpressionSyntax> parts)

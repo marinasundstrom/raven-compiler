@@ -976,11 +976,12 @@ internal sealed class DocumentStore
             else
             {
                 if (!_workspaceManager.TryGetProjectAnalyzerDiagnostics(
-                        uri,
+                        context.Value.Document,
                         context.Value.Compilation,
                         out var projectDiagnosticsWithAnalyzers,
-                        cancellationToken: effectiveCancellationToken))
-                    return new DiagnosticsComputationResult(Array.Empty<LspDiagnostic>(), WasSkipped: false);
+                        cancellationToken: effectiveCancellationToken,
+                        allowBusySkip: useBusySkip))
+                    return new DiagnosticsComputationResult(Array.Empty<LspDiagnostic>(), WasSkipped: true);
 
                 diagnosticsForProject = projectDiagnosticsWithAnalyzers;
             }
@@ -1191,7 +1192,7 @@ internal sealed class DocumentStore
         CompilationWithAnalyzersOptions? analyzerOptions,
         CancellationToken cancellationToken)
     {
-        _ = semanticModel;
+        using var ambientAccess = semanticModel.EnterAmbientSemanticAccess();
         return compilation
             .GetDocumentDiagnostics(syntaxTree, analyzerOptions, cancellationToken)
             .OrderBy(static diagnostic => diagnostic.Location)
@@ -1490,7 +1491,9 @@ internal sealed class DocumentStore
             Message = diagnostic.GetMessage(),
             Code = diagnostic.Id,
             Severity = MapSeverity(diagnostic.Severity),
-            Source = "raven",
+            Source = diagnostic.Properties.ContainsKey(Raven.CodeAnalysis.Diagnostics.AnalyzerDiagnosticProperties.AnalyzerName)
+                ? "raven-analyzer"
+                : "raven",
             Range = range,
             Tags = MapTags(diagnostic),
             Data = RavenDiagnosticData.Create(diagnostic)

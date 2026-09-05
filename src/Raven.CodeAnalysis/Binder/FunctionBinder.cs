@@ -246,10 +246,13 @@ class FunctionBinder : Binder
             _diagnostics,
             _syntax.ReturnType?.Type.GetLocation() ?? _syntax.Identifier.GetLocation());
 
+        // Match signature construction, which enumerates parameter nodes and
+        // ignores recovery tokens that need not occupy separator slots.
+        var parameterSyntaxes = _syntax.ParameterList.Parameters.ToArray();
         for (var i = 0; i < method.Parameters.Length; i++)
         {
             var parameter = method.Parameters[i];
-            var parameterSyntax = _syntax.ParameterList.Parameters[i];
+            var parameterSyntax = parameterSyntaxes[i];
             TypeMemberBinder.ValidateTypeAccessibility(
                 parameter.Type,
                 method.DeclaredAccessibility,

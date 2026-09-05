@@ -7,9 +7,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class SingleStatementBlockBodyCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(SingleStatementBlockBodyCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [SingleStatementBlockBodyAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -38,7 +41,8 @@ public sealed class SingleStatementBlockBodyCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Convert to expression body",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 
     internal static BlockStatementSyntax? TryGetBodyBlock(SyntaxNode node)

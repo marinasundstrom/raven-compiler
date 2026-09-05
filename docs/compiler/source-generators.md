@@ -119,5 +119,7 @@ twice on subsequent builds. The default `obj` directory is already excluded.
 
 In VS Code, Go to Definition opens generated declarations in a read-only
 `raven-generated` document backed by the current compilation. Hover and further
-definition navigation work inside that document. Open generated documents refresh
-after Raven source edits; enabling disk output is not required for navigation.
+definition navigation work inside that document. Compiler and analyzer diagnostics
+are shown against the generated document while it is open. Open generated documents
+refresh after Raven source edits, including their diagnostics; enabling disk output
+is not required for navigation or analysis.

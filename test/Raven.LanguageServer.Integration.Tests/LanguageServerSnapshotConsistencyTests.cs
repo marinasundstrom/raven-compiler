@@ -426,13 +426,13 @@ func Main() -> unit {
     }
 
     [Fact]
-    public async Task HoverHandler_AddedDocument_ResolvesCrossFileFunctionAsync()
+    public async Task HoverHandler_EditedProjectDocument_ResolvesCrossFileFunctionAsync()
     {
         var (store, _, mainUri) = await CreateWorkspaceAsync("""
 func Main() -> () {
     Test()
 }
-""");
+""", "test.rvn");
         var testPath = Path.Combine(_tempRoot, "src", "test.rvn");
         var testUri = DocumentUri.FromFileSystemPath(testPath);
         await store.UpsertDocumentAsync(testUri, """
@@ -1392,7 +1392,7 @@ func Main() -> unit {
     Tes
 }
 """;
-        var (store, _, uri) = await CreateWorkspaceAsync(text);
+        var (store, _, uri) = await CreateWorkspaceAsync(text, "test.rvn");
         var testPath = Path.Combine(_tempRoot, "src", "test.rvn");
         var testUri = DocumentUri.FromFileSystemPath(testPath);
         await store.UpsertDocumentAsync(testUri, """
@@ -1425,7 +1425,7 @@ func Main() -> unit {
     Tes
 }
 """;
-        var (store, _, uri) = await CreateWorkspaceAsync(text);
+        var (store, _, uri) = await CreateWorkspaceAsync(text, "test.rvn");
         var testPath = Path.Combine(_tempRoot, "src", "test.rvn");
         var testUri = DocumentUri.FromFileSystemPath(testPath);
         await store.UpsertDocumentAsync(testUri, """
@@ -1452,7 +1452,7 @@ public func Test() -> unit {
         const string text = """
 Tes
 """;
-        var (store, _, uri) = await CreateWorkspaceAsync(text);
+        var (store, _, uri) = await CreateWorkspaceAsync(text, "test.rvn");
         var testPath = Path.Combine(_tempRoot, "src", "test.rvn");
         var testUri = DocumentUri.FromFileSystemPath(testPath);
         await store.UpsertDocumentAsync(testUri, """
@@ -1484,7 +1484,7 @@ func Main() {
     x.
 }
 """;
-        var (store, _, uri) = await CreateWorkspaceAsync(text);
+        var (store, _, uri) = await CreateWorkspaceAsync(text, "test.rvn");
         var testPath = Path.Combine(_tempRoot, "src", "test.rvn");
         var testUri = DocumentUri.FromFileSystemPath(testPath);
         await store.UpsertDocumentAsync(testUri, """
@@ -2495,7 +2495,7 @@ record CustomError(val Message: string)
     {
         var repoRoot = FindRepositoryRoot();
         var projectRoot = Path.Combine(repoRoot, "samples", "projects", "aspnet-minimal-api");
-        var filePath = Path.Combine(projectRoot, "src", "Program.rvn");
+        var filePath = Path.Combine(projectRoot, "src", "Domain.rvn");
         File.Exists(filePath).ShouldBeTrue();
 
         var text = File.ReadAllText(filePath);
@@ -2555,7 +2555,7 @@ record CustomError(val Message: string)
     {
         var repoRoot = FindRepositoryRoot();
         var projectRoot = Path.Combine(repoRoot, "samples", "projects", "aspnet-minimal-api");
-        var filePath = Path.Combine(projectRoot, "src", "Program.rvn");
+        var filePath = Path.Combine(projectRoot, "src", "Domain.rvn");
         File.Exists(filePath).ShouldBeTrue();
 
         var text = File.ReadAllText(filePath);
@@ -3266,7 +3266,8 @@ class C {
         return new HoverPositionTarget(label, position.Line, position.Character, expectedText);
     }
 
-    private async Task<(DocumentStore store, WorkspaceManager manager, DocumentUri uri)> CreateWorkspaceAsync(string text)
+    private async Task<(DocumentStore store, WorkspaceManager manager, DocumentUri uri)> CreateWorkspaceAsync(
+        string text, string? additionalDocumentName = null)
     {
         Directory.CreateDirectory(_tempRoot);
 
@@ -3285,6 +3286,8 @@ class C {
         var filePath = Path.Combine(_tempRoot, "src", "main.rvn");
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
         File.WriteAllText(filePath, text);
+        if (additionalDocumentName is not null)
+            File.WriteAllText(Path.Combine(_tempRoot, "src", additionalDocumentName), "");
 
         var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
         var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);

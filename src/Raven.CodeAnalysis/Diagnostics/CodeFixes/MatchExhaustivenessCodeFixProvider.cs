@@ -8,6 +8,9 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class MatchExhaustivenessCodeFixProvider : CodeFixProvider
 {
+    private const string AddMissingArmsEquivalenceKey = nameof(MatchExhaustivenessCodeFixProvider) + ".AddMissingArms";
+    private const string ReplaceCatchAllEquivalenceKey = nameof(MatchExhaustivenessCodeFixProvider) + ".ReplaceCatchAll";
+    private const string RemoveCatchAllEquivalenceKey = nameof(MatchExhaustivenessCodeFixProvider) + ".RemoveCatchAll";
     private const string ThrowPlaceholderExpression = "throw System.NotImplementedException()";
 
     private static readonly ImmutableArray<string> FixableIds =
@@ -17,6 +20,8 @@ public sealed class MatchExhaustivenessCodeFixProvider : CodeFixProvider
     ];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -94,7 +99,8 @@ public sealed class MatchExhaustivenessCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 title,
                 context.Document.Id,
-                change));
+                change,
+                AddMissingArmsEquivalenceKey));
     }
 
     private static bool IsPrimaryMissingCaseDiagnostic(CodeFixContext context, Diagnostic diagnostic)
@@ -160,7 +166,8 @@ public sealed class MatchExhaustivenessCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 $"Replace catch-all with '{patternText}'",
                 context.Document.Id,
-                change));
+                change,
+                ReplaceCatchAllEquivalenceKey));
     }
 
     private static void RegisterRemoveCatchAllFix(CodeFixContext context, MatchArmSyntax arm)
@@ -175,7 +182,8 @@ public sealed class MatchExhaustivenessCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Remove redundant catch-all arm",
                 context.Document.Id,
-                new TextChange(span, string.Empty)));
+                new TextChange(span, string.Empty),
+                RemoveCatchAllEquivalenceKey));
     }
 
     private static SyntaxNode? FindMatch(SyntaxNode root, TextSpan diagnosticSpan)

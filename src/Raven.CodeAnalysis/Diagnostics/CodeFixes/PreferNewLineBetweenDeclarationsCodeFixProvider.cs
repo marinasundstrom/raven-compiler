@@ -6,9 +6,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class PreferNewLineBetweenDeclarationsCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(PreferNewLineBetweenDeclarationsCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [PreferNewLineBetweenDeclarationsAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -27,6 +30,7 @@ public sealed class PreferNewLineBetweenDeclarationsCodeFixProvider : CodeFixPro
             CodeAction.CreateTextChange(
                 "Insert newline between declarations",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 }

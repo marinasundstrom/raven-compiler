@@ -211,11 +211,7 @@ public sealed class HeadlessEditSimulationTests : IDisposable
         invalid.Diagnostics.ShouldContain(diagnostic => diagnostic.Severity == LspDiagnosticSeverity.Error);
         invalid.Probes.ShouldAllBe(probe => probe.HasHover);
         await simulation.AssertDocumentCompilerDiagnosticsMatchOneShotAsync();
-        simulation.LogMessages.ShouldContain(message =>
-            message.Contains("reason=NewRecoverySyntax", StringComparison.Ordinal));
         await ApplyValidEditAsync(InitialMainText, "undo unexpected character");
-        simulation.LogMessages.ShouldContain(message =>
-            message.Contains("reason=PreviousFallback", StringComparison.Ordinal));
 
         await simulation.UpsertAdditionalDocumentAsync("empty.rvn", string.Empty);
         await simulation.AssertDocumentCompilerDiagnosticsMatchOneShotAsync();

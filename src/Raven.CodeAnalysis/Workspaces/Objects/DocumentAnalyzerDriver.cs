@@ -68,6 +68,19 @@ internal sealed class DocumentAnalyzerDriver
         bool allowBusySkip = false,
         bool semanticAccessAlreadyHeld = false,
         bool includeCompilationActions = false)
+        => RunWithResult(project, syntaxTree, compilation, analyzerOptions, eventSink, cancellationToken,
+            allowBusySkip, semanticAccessAlreadyHeld, includeCompilationActions).Diagnostics;
+
+    public static AnalyzerDiagnosticsResult RunWithResult(
+        Project project,
+        SyntaxTree syntaxTree,
+        Compilation compilation,
+        CompilationWithAnalyzersOptions? analyzerOptions,
+        IWorkspaceEventSink? eventSink,
+        CancellationToken cancellationToken,
+        bool allowBusySkip = false,
+        bool semanticAccessAlreadyHeld = false,
+        bool includeCompilationActions = false)
     {
         var driver = new DocumentAnalyzerDriver(
             project,
@@ -83,7 +96,7 @@ internal sealed class DocumentAnalyzerDriver
         return driver.RunCore();
     }
 
-    private ImmutableArray<Diagnostic> RunCore()
+    private AnalyzerDiagnosticsResult RunCore()
     {
         var totalTimestamp = Stopwatch.GetTimestamp();
 
@@ -98,12 +111,15 @@ internal sealed class DocumentAnalyzerDriver
             ReportSymbolEnumerationStats();
             ReportAnalyzerStats(executions);
 
+            var failureCount = executions.Sum(static execution => execution.Stats.Failures);
             ReportWorkspaceEvent(
                 "documentAnalyzer.total",
                 Stopwatch.GetElapsedTime(totalTimestamp).TotalMilliseconds,
-                $"analyzers={executions.Count}, diagnostics={_diagnostics.Count}, outcome=completed");
+                $"analyzers={executions.Count}, diagnostics={_diagnostics.Count}, failures={failureCount}, outcome={(failureCount == 0 ? "completed" : "completedWithFailures")}");
 
-            return _diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray();
+            return new AnalyzerDiagnosticsResult(
+                _diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray(),
+                Succeeded: failureCount == 0);
         }
         catch (OperationCanceledException)
         {
@@ -134,9 +150,10 @@ internal sealed class DocumentAnalyzerDriver
         var execution = new AnalyzerExecution(analyzer, stats);
         var isInternalAnalyzer = AnalyzerDiagnosticIdValidator.IsInternalAnalyzer(analyzer);
         var initializationTimestamp = Stopwatch.GetTimestamp();
-        if (!analyzer.TryEnsureInitialized())
+        if (!analyzer.TryEnsureInitialized(out var initializationException))
         {
             stats.InitializationTicks += Stopwatch.GetTimestamp() - initializationTimestamp;
+            RecordAnalyzerFailure(stats, "Initialize", initializationException!);
             return execution;
         }
 
@@ -145,10 +162,12 @@ internal sealed class DocumentAnalyzerDriver
 
         void ReportDiagnostic(Diagnostic diagnostic)
         {
+            if (!analyzer.ShouldReportDiagnostic(diagnostic, _compilation))
+                return;
             AnalyzerDiagnosticIdValidator.Validate(analyzer, diagnostic, isInternalAnalyzer);
 
             var mapped = _compilation.ApplyCompilationOptions(
-                diagnostic,
+                AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, analyzer),
                 _analyzerOptions?.ReportSuppressedDiagnostics ?? false);
             if (mapped is not null)
             {
@@ -161,6 +180,9 @@ internal sealed class DocumentAnalyzerDriver
         }
 
         CollectCompilationActions(analyzer, execution, ReportDiagnostic, stats);
+        if (!analyzer.ShouldAnalyzeTree(_syntaxTree, _compilation))
+            return execution;
+
         CollectSyntaxTreeActions(analyzer, execution, ReportDiagnostic, stats);
         CollectSymbolActions(analyzer, execution, ReportDiagnostic, stats);
         CollectSyntaxNodeActions(analyzer, execution, ReportDiagnostic, stats);
@@ -210,11 +232,11 @@ internal sealed class DocumentAnalyzerDriver
             {
                 throw;
             }
-            catch
+            catch (Exception exception)
             {
                 // Analyzer failures should not stop normal compilation diagnostics.
                 action.Stats.CompilationActionCount++;
-                action.Stats.Failures++;
+                RecordAnalyzerFailure(action.Stats, "Compilation", exception);
             }
         }
     }
@@ -242,7 +264,7 @@ internal sealed class DocumentAnalyzerDriver
         {
             _cancellationToken.ThrowIfCancellationRequested();
 
-            var action = new DocumentSymbolAnalyzerAction(registration.Action, reportDiagnostic, stats);
+            var action = new DocumentSymbolAnalyzerAction(analyzer, registration.Action, reportDiagnostic, stats);
             foreach (var kind in registration.Kinds)
             {
                 if (!execution.SymbolActionsByKind.TryGetValue(kind, out var actions))
@@ -284,11 +306,11 @@ internal sealed class DocumentAnalyzerDriver
             {
                 throw;
             }
-            catch
+            catch (Exception exception)
             {
                 // Analyzer failures should not stop normal compilation diagnostics.
                 action.Stats.SyntaxTreeActionCount++;
-                action.Stats.Failures++;
+                RecordAnalyzerFailure(action.Stats, "SyntaxTree", exception);
             }
         }
     }
@@ -303,7 +325,7 @@ internal sealed class DocumentAnalyzerDriver
         {
             _cancellationToken.ThrowIfCancellationRequested();
 
-            var action = new DocumentSyntaxNodeAnalyzerAction(registration.Action, registration.Scope, reportDiagnostic, stats);
+            var action = new DocumentSyntaxNodeAnalyzerAction(analyzer, registration.Action, registration.Scope, reportDiagnostic, stats);
             foreach (var kind in registration.Kinds)
             {
                 if (!execution.SyntaxNodeActionsByKind.TryGetValue(kind, out var actions))
@@ -327,7 +349,7 @@ internal sealed class DocumentAnalyzerDriver
         {
             _cancellationToken.ThrowIfCancellationRequested();
 
-            var action = new DocumentOperationAnalyzerAction(registration.Action, reportDiagnostic, stats);
+            var action = new DocumentOperationAnalyzerAction(analyzer, registration.Action, reportDiagnostic, stats);
             foreach (var kind in registration.Kinds)
             {
                 if (!execution.OperationActionsByKind.TryGetValue(kind, out var actions))
@@ -420,6 +442,8 @@ internal sealed class DocumentAnalyzerDriver
             foreach (var action in actions)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
+                if (!action.Analyzer.ShouldAnalyzeNode(node, semanticModel))
+                    continue;
                 actionInvocations++;
                 RunSyntaxNodeAction(node, semanticModel, action);
             }
@@ -463,6 +487,8 @@ internal sealed class DocumentAnalyzerDriver
             foreach (var action in actions)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
+                if (!action.Analyzer.ShouldAnalyzeSymbol(symbol))
+                    continue;
                 RunSymbolAction(symbol, action);
             }
         }
@@ -501,6 +527,8 @@ internal sealed class DocumentAnalyzerDriver
             foreach (var action in actions)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
+                if (!action.Analyzer.ShouldAnalyzeNode(operation.Syntax, semanticModel))
+                    continue;
                 _operationActionInvocations++;
                 RunOperationAction(operation, semanticModel, action);
             }
@@ -694,11 +722,11 @@ internal sealed class DocumentAnalyzerDriver
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             // Analyzer failures should not stop normal compilation diagnostics.
             action.Stats.SyntaxNodeActionCount++;
-            action.Stats.Failures++;
+            RecordAnalyzerFailure(action.Stats, "SyntaxNode", exception);
         }
     }
 
@@ -723,11 +751,11 @@ internal sealed class DocumentAnalyzerDriver
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             // Analyzer failures should not stop normal compilation diagnostics.
             action.Stats.SymbolActionCount++;
-            action.Stats.Failures++;
+            RecordAnalyzerFailure(action.Stats, "Symbol", exception);
         }
     }
 
@@ -754,12 +782,21 @@ internal sealed class DocumentAnalyzerDriver
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             // Analyzer failures should not stop normal compilation diagnostics.
             action.Stats.OperationActionCount++;
-            action.Stats.Failures++;
+            RecordAnalyzerFailure(action.Stats, "Operation", exception);
         }
+    }
+
+    private void RecordAnalyzerFailure(DocumentAnalyzerStats stats, string phase, Exception exception)
+    {
+        stats.Failures++;
+        // A failing node callback may throw thousands of times. Keep one detailed
+        // event per phase and analyzer, while retaining the total failure count.
+        if (stats.ReportedFailurePhases.Add(phase))
+            ReportWorkspaceEvent("documentAnalyzer.failure", 0, $"{stats.AnalyzerName}: phase={phase}, exception={exception}");
     }
 
     private void ReportAnalyzerStats(IReadOnlyList<AnalyzerExecution> executions)
@@ -835,17 +872,20 @@ internal sealed class DocumentAnalyzerDriver
         DocumentAnalyzerStats Stats);
 
     private readonly record struct DocumentSymbolAnalyzerAction(
+        DiagnosticAnalyzer Analyzer,
         Action<SymbolAnalysisContext> Action,
         Action<Diagnostic> ReportDiagnostic,
         DocumentAnalyzerStats Stats);
 
     private readonly record struct DocumentSyntaxNodeAnalyzerAction(
+        DiagnosticAnalyzer Analyzer,
         Action<SyntaxNodeAnalysisContext> Action,
         SyntaxNodeAnalysisScope Scope,
         Action<Diagnostic> ReportDiagnostic,
         DocumentAnalyzerStats Stats);
 
     private readonly record struct DocumentOperationAnalyzerAction(
+        DiagnosticAnalyzer Analyzer,
         Action<OperationAnalysisContext> Action,
         Action<Diagnostic> ReportDiagnostic,
         DocumentAnalyzerStats Stats);
@@ -871,6 +911,7 @@ internal sealed class DocumentAnalyzerDriver
         public int OperationActionCount;
         public int Diagnostics;
         public int Failures;
+        public HashSet<string> ReportedFailurePhases { get; } = [];
         public bool ConcurrentExecutionEnabled;
 
         public double TotalMilliseconds => TicksToMilliseconds(
@@ -882,3 +923,5 @@ internal sealed class DocumentAnalyzerDriver
             OperationActionTicks);
     }
 }
+
+internal readonly record struct AnalyzerDiagnosticsResult(ImmutableArray<Diagnostic> Diagnostics, bool Succeeded);

@@ -7,9 +7,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class VarCanBeLetCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(VarCanBeLetCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [VarCanBeLetAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -40,6 +43,7 @@ public sealed class VarCanBeLetCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Replace 'var' with 'let'",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 }

@@ -17,7 +17,15 @@ internal sealed class LanguageServerWorkspaceEventSink : IWorkspaceEventSink
 
     public void Report(WorkspaceEvent workspaceEvent)
     {
-        if (workspaceEvent.ElapsedMilliseconds >= 50)
+        if (workspaceEvent.Operation == "documentAnalyzer.failure")
+        {
+            _logger.LogWarning(
+                "Analyzer failure in project {Project}, document {Document}: {Detail}",
+                workspaceEvent.ProjectName ?? "<none>",
+                workspaceEvent.DocumentPath ?? "<none>",
+                workspaceEvent.Detail);
+        }
+        else if (workspaceEvent.ElapsedMilliseconds >= 50)
         {
             _logger.LogInformation(
                 "Workspace event {Operation}: elapsed={ElapsedMs:F1}ms project={Project} document={Document} detail={Detail}.",

@@ -95,6 +95,25 @@ dotnet_diagnostic.RAV9013.severity = none
 dotnet_diagnostic.RAV9014.severity = none
 ```
 
+## `.editorconfig` generated-code support
+
+Raven also reads the standard per-file `generated_code` key:
+
+```ini
+[generated/**/*.rvn]
+generated_code = true
+
+[generated/Editable.g.rvn]
+generated_code = false
+```
+
+An explicit value overrides generated filename and header conventions for the
+matching file. Normal `.editorconfig` precedence applies: files closer to the
+source file override parent files, and later matching sections override earlier
+sections. Invalid values are ignored. The language server watches `.editorconfig`
+and invalidates analyzer results when this classification changes without
+reloading the project.
+
 ## Raven source inclusion
 
 Raven projects implicitly include `**/*.rvn`, excluding the SDK's normal

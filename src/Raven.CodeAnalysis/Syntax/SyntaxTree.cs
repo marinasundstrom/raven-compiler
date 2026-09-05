@@ -39,12 +39,15 @@ public partial class SyntaxTree
     private readonly ParseOptions _options;
     private IReadOnlyList<Diagnostic>? _diagnostics;
 
-    internal SyntaxTree(SourceText sourceText, string filePath, ParseOptions? options)
+    internal SyntaxTree(SourceText sourceText, string filePath, ParseOptions? options, bool isGenerated = false)
     {
+        IsGenerated = isGenerated;
         _sourceText = sourceText;
         FilePath = filePath ?? "file";
         _options = (options ?? new ParseOptions()).Snapshot();
     }
+
+    internal bool IsGenerated { get; }
 
     public Encoding Encoding => _sourceText.Encoding;
     public string FilePath { get; }
@@ -64,13 +67,19 @@ public partial class SyntaxTree
     }
 
     public static SyntaxTree ParseText(SourceText sourceText, ParseOptions? options = null, string? path = null)
+        => ParseTextCore(sourceText, options, path, isGenerated: false);
+
+    internal static SyntaxTree ParseGeneratedText(SourceText sourceText, string path)
+        => ParseTextCore(sourceText, options: null, path, isGenerated: true);
+
+    private static SyntaxTree ParseTextCore(SourceText sourceText, ParseOptions? options, string? path, bool isGenerated)
     {
         var parser = new InternalSyntax.Parser.LanguageParser(path ?? "file", options ?? new ParseOptions());
 
         var parseResult = parser.Parse(sourceText);
         var compilationUnit = (CompilationUnitSyntax)parseResult.Root.CreateRed();
 
-        var sourceTree = new SyntaxTree(sourceText, path ?? "file", options);
+        var sourceTree = new SyntaxTree(sourceText, path ?? "file", options, isGenerated);
 
         compilationUnit = compilationUnit
             .WithSyntaxTree(sourceTree);
@@ -136,9 +145,10 @@ public partial class SyntaxTree
         CompilationUnitSyntax compilationUnit,
         ParseOptions options,
         string? filePath = null,
-        IEnumerable<InternalSyntax.DiagnosticInfo>? diagnostics = null)
+        IEnumerable<InternalSyntax.DiagnosticInfo>? diagnostics = null,
+        bool isGenerated = false)
     {
-        var syntaxTree = new SyntaxTree(sourceText, filePath ?? string.Empty, options);
+        var syntaxTree = new SyntaxTree(sourceText, filePath ?? string.Empty, options, isGenerated);
 
         compilationUnit = compilationUnit
             .WithSyntaxTree(syntaxTree);
@@ -317,7 +327,7 @@ public partial class SyntaxTree
             newCompilationUnit,
             _options,
             FilePath,
-            updatedDiagnostics.OrderBy(static diagnostic => diagnostic.Span.Start));
+            updatedDiagnostics.OrderBy(static diagnostic => diagnostic.Span.Start), isGenerated: IsGenerated);
         if (!string.Equals(updatedTree.GetRoot().ToFullString(), newText.ToString(), StringComparison.Ordinal))
         {
             return ParseTextWithFallback(newText, IncrementalParseFallbackReason.ReconstructedTextMismatch);
@@ -336,7 +346,7 @@ public partial class SyntaxTree
         if (_options.ThrowOnIncrementalParseFallback)
             throw new IncrementalParseFallbackException(reason, FilePath);
 
-        var tree = ParseText(newText, _options, FilePath);
+        var tree = ParseTextCore(newText, _options, FilePath, IsGenerated);
         tree.IncrementalParseFallbackReason = reason;
         return tree;
     }

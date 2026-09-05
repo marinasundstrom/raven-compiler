@@ -7,9 +7,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class ExpressionBodyToBlockBodyCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(ExpressionBodyToBlockBodyCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [ExpressionBodyToBlockBodyAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -44,7 +47,8 @@ public sealed class ExpressionBodyToBlockBodyCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Convert to block body",
                 context.Document.Id,
-                change));
+                change,
+                EquivalenceKey));
     }
 
     internal static SyntaxNode? FindDeclaration(SyntaxNode node)

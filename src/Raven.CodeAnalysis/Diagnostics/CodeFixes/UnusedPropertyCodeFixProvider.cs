@@ -8,9 +8,12 @@ namespace Raven.CodeAnalysis.Diagnostics;
 
 public sealed class UnusedPropertyCodeFixProvider : CodeFixProvider
 {
+    private const string EquivalenceKey = nameof(UnusedPropertyCodeFixProvider);
     private static readonly ImmutableArray<string> FixableIds = [UnusedPropertyAnalyzer.DiagnosticId];
 
     public override IEnumerable<string> FixableDiagnosticIds => FixableIds;
+
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
 
     public override void RegisterCodeFixes(CodeFixContext context)
     {
@@ -36,7 +39,8 @@ public sealed class UnusedPropertyCodeFixProvider : CodeFixProvider
             CodeAction.CreateTextChange(
                 "Remove unused property",
                 context.Document.Id,
-                new TextChange(span, string.Empty)));
+                new TextChange(span, string.Empty),
+                EquivalenceKey));
     }
 
     private static TextSpan GetRemovalSpan(PropertyDeclarationSyntax propertyDecl)
