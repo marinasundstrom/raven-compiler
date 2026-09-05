@@ -621,13 +621,28 @@ public class Workspace
                 analyzerOptions,
                 cancellationToken);
 
+            var analyzedTrees = new HashSet<SyntaxTree>(ReferenceEqualityComparer.Instance);
             foreach (var document in project.Documents.OrderBy(static document => document.FilePath, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                analyzedTrees.UnionWith(GetCompilationSyntaxTrees(document, compilation));
                 var documentResult = GetDocumentAnalyzerResult(document, compilation, analyzerOptions,
                     allowBusySkip: false, semanticAccessAlreadyHeld: false, cancellationToken);
                 succeeded &= documentResult.Succeeded;
                 AddDiagnostics(diagnostics, documentResult.Diagnostics, cancellationToken);
+            }
+
+            // Generated trees belong to the compilation but have no authored workspace document.
+            foreach (var tree in compilation.SyntaxTrees)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!analyzedTrees.Add(tree))
+                    continue;
+
+                var treeResult = DocumentAnalyzerDriver.RunWithResult(
+                    project, tree, compilation, analyzerOptions, Services.WorkspaceEventSink, cancellationToken);
+                succeeded &= treeResult.Succeeded;
+                AddDiagnostics(diagnostics, treeResult.Diagnostics, cancellationToken);
             }
         }
 

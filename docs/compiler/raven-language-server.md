@@ -215,3 +215,9 @@ Analyzer diagnostics include `Raven.AnalyzerName` in their properties and are
 presented with the `raven-analyzer` source. This origin metadata lets the editor
 preserve external analyzer warnings during compiler-only refreshes without
 relying on an analyzer-specific diagnostic ID prefix.
+
+Project-wide analyzer execution includes compilation trees produced by source
+generators, even when they have no authored workspace document. Each generated
+tree uses the same analyzer driver and source suppression rules as authored
+code. Compilation callbacks still run once per project, and a failure in a
+generated tree prevents caching an incomplete project result.
