@@ -96,9 +96,31 @@ public abstract class DiagnosticAnalyzer
     internal bool ShouldAnalyzeTree(SyntaxTree tree)
         => !tree.IsGeneratedCode || (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0;
 
-    internal bool ShouldReportDiagnostic(Diagnostic diagnostic)
-        => diagnostic.Location.SourceTree?.IsGeneratedCode != true ||
-            (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.ReportDiagnostics) != 0;
+    internal bool ShouldAnalyzeSymbol(ISymbol symbol)
+        => (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0 || !IsGeneratedSymbol(symbol);
+
+    internal bool ShouldAnalyzeNode(SyntaxNode node, SemanticModel semanticModel)
+        => (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0 ||
+            !IsWithinGeneratedSymbol(node, semanticModel);
+
+    internal bool ShouldReportDiagnostic(Diagnostic diagnostic, Compilation compilation)
+    {
+        if ((_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.ReportDiagnostics) != 0)
+            return true;
+
+        var tree = diagnostic.Location.SourceTree;
+        if (tree is null)
+            return true;
+        if (tree.IsGeneratedCode)
+            return false;
+
+        var span = diagnostic.Location.SourceSpan;
+        if (span.Start < 0 || span.Start >= tree.Length)
+            return true;
+
+        var node = tree.GetRoot().FindToken(span.Start).Parent;
+        return node is null || !IsWithinGeneratedSymbol(node, compilation.GetSemanticModel(tree));
+    }
 
     /// <summary>Runs the analyzer for the specified compilation.</summary>
     public IEnumerable<Diagnostic> Analyze(Compilation compilation, CancellationToken cancellationToken = default)
@@ -118,7 +140,7 @@ public abstract class DiagnosticAnalyzer
         var diagnostics = new List<Diagnostic>();
         void ReportDiagnostic(Diagnostic diagnostic)
         {
-            if (ShouldReportDiagnostic(diagnostic))
+            if (ShouldReportDiagnostic(diagnostic, compilation))
                 diagnostics.Add(diagnostic);
         }
         var syntaxTrees = syntaxTree is null
@@ -175,6 +197,9 @@ public abstract class DiagnosticAnalyzer
                 var symbolSemanticModel = compilation.GetSemanticModel(tree);
                 foreach (var symbol in AnalyzerSymbolEnumerator.EnumerateSymbols(tree, symbolSemanticModel, GetRegisteredSymbolKinds(), cancellationToken))
                 {
+                    if (!ShouldAnalyzeSymbol(symbol))
+                        continue;
+
                     foreach (var registration in _symbolActions)
                     {
                         if (!registration.Kinds.Contains(symbol.Kind))
@@ -212,6 +237,9 @@ public abstract class DiagnosticAnalyzer
 
                 foreach (var node in root.DescendantNodesAndSelf())
                 {
+                    if (!ShouldAnalyzeNode(node, semanticModel))
+                        continue;
+
                     for (var i = 0; i < _syntaxNodeActions.Count; i++)
                     {
                         var registration = _syntaxNodeActions[i];
@@ -252,6 +280,9 @@ public abstract class DiagnosticAnalyzer
                          GetRegisteredOperationKinds(),
                          cancellationToken))
             {
+                if (!ShouldAnalyzeNode(operation.Syntax, semanticModel))
+                    continue;
+
                 foreach (var registration in _operationActions)
                 {
                     if (!registration.Kinds.Contains(operation.Kind))
@@ -295,6 +326,33 @@ public abstract class DiagnosticAnalyzer
             => _operationActions
                 .SelectMany(static action => action.Kinds)
                 .ToImmutableHashSet();
+    }
+
+    private static bool IsWithinGeneratedSymbol(SyntaxNode node, SemanticModel semanticModel)
+    {
+        foreach (var candidate in node.AncestorsAndSelf())
+        {
+            if (candidate is not (MemberDeclarationSyntax or FunctionStatementSyntax))
+                continue;
+            if (semanticModel.GetDeclaredSymbol(candidate) is { } symbol)
+                return IsGeneratedSymbol(symbol);
+        }
+        return false;
+    }
+
+    private static bool IsGeneratedSymbol(ISymbol symbol)
+    {
+        for (var current = symbol; current is not null; current = current.ContainingSymbol)
+        {
+            if (current.Kind == SymbolKind.Namespace)
+                continue;
+            if (current.DeclaringSyntaxReferences.Length > 1)
+                return false;
+            if (current.GetAttributes().Any(static attribute =>
+                    attribute.AttributeClass.ToFullyQualifiedMetadataName() == "System.CodeDom.Compiler.GeneratedCodeAttribute"))
+                return true;
+        }
+        return false;
     }
 }
 

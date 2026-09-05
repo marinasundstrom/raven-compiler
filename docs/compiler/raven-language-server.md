@@ -238,6 +238,14 @@ retained across text changes. It also recognizes file names ending in `.g.rvn`,
 are case-sensitive. Markers in code or comments after the first token do not count.
 Header classification is cached per immutable tree and recalculated after edits,
 so removing a header restores normal analysis unless another generated indicator
-still applies. Attribute-based recognition is not yet supported. Compiler
-diagnostics and source suppression directives retain their existing behavior.
-Configuration is published only after analyzer initialization succeeds.
+still applies.
+
+`System.CodeDom.Compiler.GeneratedCodeAttribute` marks a source type or member as
+generated for symbol, syntax-node, and operation callbacks. The classification
+also applies to members nested under an attributed type and to analyzer
+diagnostics whose source location is inside the generated declaration. A partial
+symbol with multiple source declarations remains non-generated, even when one
+part carries the attribute, while an individually attributed member remains
+generated. Compiler diagnostics and source suppression directives retain their
+existing behavior. Configuration is published only after analyzer initialization
+succeeds.

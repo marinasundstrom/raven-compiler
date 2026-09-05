@@ -162,7 +162,7 @@ internal sealed class DocumentAnalyzerDriver
 
         void ReportDiagnostic(Diagnostic diagnostic)
         {
-            if (!analyzer.ShouldReportDiagnostic(diagnostic))
+            if (!analyzer.ShouldReportDiagnostic(diagnostic, _compilation))
                 return;
             AnalyzerDiagnosticIdValidator.Validate(analyzer, diagnostic, isInternalAnalyzer);
 
@@ -264,7 +264,7 @@ internal sealed class DocumentAnalyzerDriver
         {
             _cancellationToken.ThrowIfCancellationRequested();
 
-            var action = new DocumentSymbolAnalyzerAction(registration.Action, reportDiagnostic, stats);
+            var action = new DocumentSymbolAnalyzerAction(analyzer, registration.Action, reportDiagnostic, stats);
             foreach (var kind in registration.Kinds)
             {
                 if (!execution.SymbolActionsByKind.TryGetValue(kind, out var actions))
@@ -325,7 +325,7 @@ internal sealed class DocumentAnalyzerDriver
         {
             _cancellationToken.ThrowIfCancellationRequested();
 
-            var action = new DocumentSyntaxNodeAnalyzerAction(registration.Action, registration.Scope, reportDiagnostic, stats);
+            var action = new DocumentSyntaxNodeAnalyzerAction(analyzer, registration.Action, registration.Scope, reportDiagnostic, stats);
             foreach (var kind in registration.Kinds)
             {
                 if (!execution.SyntaxNodeActionsByKind.TryGetValue(kind, out var actions))
@@ -349,7 +349,7 @@ internal sealed class DocumentAnalyzerDriver
         {
             _cancellationToken.ThrowIfCancellationRequested();
 
-            var action = new DocumentOperationAnalyzerAction(registration.Action, reportDiagnostic, stats);
+            var action = new DocumentOperationAnalyzerAction(analyzer, registration.Action, reportDiagnostic, stats);
             foreach (var kind in registration.Kinds)
             {
                 if (!execution.OperationActionsByKind.TryGetValue(kind, out var actions))
@@ -442,6 +442,8 @@ internal sealed class DocumentAnalyzerDriver
             foreach (var action in actions)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
+                if (!action.Analyzer.ShouldAnalyzeNode(node, semanticModel))
+                    continue;
                 actionInvocations++;
                 RunSyntaxNodeAction(node, semanticModel, action);
             }
@@ -485,6 +487,8 @@ internal sealed class DocumentAnalyzerDriver
             foreach (var action in actions)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
+                if (!action.Analyzer.ShouldAnalyzeSymbol(symbol))
+                    continue;
                 RunSymbolAction(symbol, action);
             }
         }
@@ -523,6 +527,8 @@ internal sealed class DocumentAnalyzerDriver
             foreach (var action in actions)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
+                if (!action.Analyzer.ShouldAnalyzeNode(operation.Syntax, semanticModel))
+                    continue;
                 _operationActionInvocations++;
                 RunOperationAction(operation, semanticModel, action);
             }
@@ -866,17 +872,20 @@ internal sealed class DocumentAnalyzerDriver
         DocumentAnalyzerStats Stats);
 
     private readonly record struct DocumentSymbolAnalyzerAction(
+        DiagnosticAnalyzer Analyzer,
         Action<SymbolAnalysisContext> Action,
         Action<Diagnostic> ReportDiagnostic,
         DocumentAnalyzerStats Stats);
 
     private readonly record struct DocumentSyntaxNodeAnalyzerAction(
+        DiagnosticAnalyzer Analyzer,
         Action<SyntaxNodeAnalysisContext> Action,
         SyntaxNodeAnalysisScope Scope,
         Action<Diagnostic> ReportDiagnostic,
         DocumentAnalyzerStats Stats);
 
     private readonly record struct DocumentOperationAnalyzerAction(
+        DiagnosticAnalyzer Analyzer,
         Action<OperationAnalysisContext> Action,
         Action<Diagnostic> ReportDiagnostic,
         DocumentAnalyzerStats Stats);
