@@ -180,7 +180,7 @@ internal sealed class DocumentAnalyzerDriver
         }
 
         CollectCompilationActions(analyzer, execution, ReportDiagnostic, stats);
-        if (!analyzer.ShouldAnalyzeTree(_syntaxTree))
+        if (!analyzer.ShouldAnalyzeTree(_syntaxTree, _compilation))
             return execution;
 
         CollectSyntaxTreeActions(analyzer, execution, ReportDiagnostic, stats);

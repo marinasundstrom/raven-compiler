@@ -93,8 +93,8 @@ public abstract class DiagnosticAnalyzer
 
     internal bool ConcurrentExecutionEnabled => _concurrentExecutionEnabled;
 
-    internal bool ShouldAnalyzeTree(SyntaxTree tree)
-        => !tree.IsGeneratedCode || (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0;
+    internal bool ShouldAnalyzeTree(SyntaxTree tree, Compilation compilation)
+        => !IsGeneratedTree(tree, compilation) || (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0;
 
     internal bool ShouldAnalyzeSymbol(ISymbol symbol)
         => (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0 || !IsGeneratedSymbol(symbol);
@@ -111,7 +111,7 @@ public abstract class DiagnosticAnalyzer
         var tree = diagnostic.Location.SourceTree;
         if (tree is null)
             return true;
-        if (tree.IsGeneratedCode)
+        if (IsGeneratedTree(tree, compilation))
             return false;
 
         var span = diagnostic.Location.SourceSpan;
@@ -172,7 +172,7 @@ public abstract class DiagnosticAnalyzer
 
         foreach (var tree in syntaxTrees)
         {
-            if (!ShouldAnalyzeTree(tree))
+            if (!ShouldAnalyzeTree(tree, compilation))
                 continue;
             var treeContext = new SyntaxTreeAnalysisContext(tree, compilation, ReportDiagnostic, cancellationToken);
             foreach (var action in _syntaxTreeActions)
@@ -338,6 +338,18 @@ public abstract class DiagnosticAnalyzer
                 return IsGeneratedSymbol(symbol);
         }
         return false;
+    }
+
+    private static bool IsGeneratedTree(SyntaxTree tree, Compilation compilation)
+    {
+        if (!string.IsNullOrWhiteSpace(tree.FilePath))
+        {
+            var path = Path.GetFullPath(tree.FilePath);
+            if (compilation.Options.GeneratedCodeOptions.TryGetValue(path, out var configured))
+                return configured;
+        }
+
+        return tree.IsGeneratedCode;
     }
 
     private static bool IsGeneratedSymbol(ISymbol symbol)

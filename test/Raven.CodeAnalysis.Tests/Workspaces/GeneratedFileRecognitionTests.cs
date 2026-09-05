@@ -5,6 +5,85 @@ namespace Raven.CodeAnalysis.Tests.Workspaces;
 
 public sealed class GeneratedFileRecognitionTests
 {
+    [Fact]
+    public void EditorConfigGeneratedCode_OverridesFileConventionsPerDocument()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var authoredPath = Path.Combine(directory, "Authored.rvn");
+            var generatedPath = Path.Combine(directory, "Generated.g.rvn");
+            File.WriteAllText(Path.Combine(directory, ".editorconfig"), """
+root = true
+
+[*.rvn]
+generated_code = true
+
+[*.g.rvn]
+generated_code = false
+""");
+            var options = EditorConfigDiagnosticOptions.ApplyOptions(
+                new CompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+                directory,
+                [authoredPath, generatedPath]);
+            var trees = new[]
+            {
+                Raven.CodeAnalysis.Syntax.SyntaxTree.ParseText("class Authored {}", path: authoredPath),
+                Raven.CodeAnalysis.Syntax.SyntaxTree.ParseText("class Generated {}", path: generatedPath)
+            };
+            var analyzer = new OptOutAnalyzer();
+
+            analyzer.Analyze(Compilation.Create("Test", trees, options)).ToArray();
+
+            analyzer.Calls.ShouldBe(1);
+            options.GeneratedCodeOptions[authoredPath].ShouldBeTrue();
+            options.GeneratedCodeOptions[generatedPath].ShouldBeFalse();
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void EditorConfigGeneratedCode_NearestFileAndLaterSectionWin()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var nested = Path.Combine(directory, "src");
+        Directory.CreateDirectory(nested);
+        try
+        {
+            var sourcePath = Path.Combine(nested, "Input.rvn");
+            File.WriteAllText(Path.Combine(directory, ".editorconfig"), """
+root = true
+
+[*.rvn]
+generated_code = true
+""");
+            File.WriteAllText(Path.Combine(nested, ".editorconfig"), """
+[*.rvn]
+generated_code = false
+
+[Input.rvn]
+generated_code = true
+""");
+
+            var options = EditorConfigDiagnosticOptions.ApplyOptions(
+                new CompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+                directory,
+                [sourcePath]);
+
+            options.GeneratedCodeOptions[sourcePath].ShouldBeTrue();
+            options.WithSpecificDiagnosticOption("AN9050", ReportDiagnostic.Error)
+                .GeneratedCodeOptions[sourcePath].ShouldBeTrue();
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData("Input.g.rvn", "class C {}", true)]
     [InlineData("Input.g.i.rvn", "class C {}", true)]

@@ -6,6 +6,8 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Added
 
+- `.editorconfig` supports per-file `generated_code = true` or `false` analyzer
+  classification, including live updates in the language server.
 - Generated-code analyzer policies now recognize `GeneratedCodeAttribute` on
   source types and members, including callbacks and location-based reporting.
 - Generated-code analyzer policies recognize conventional generated file names and

@@ -21,15 +21,26 @@ public static class EditorConfigDiagnosticOptions
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var loaded = LoadDiagnosticSeverityOptions(projectOrSourcePath, sourceFilePaths);
-        if (loaded.Count == 0)
-            return options;
+        var diagnostics = LoadDiagnosticSeverityOptions(projectOrSourcePath, sourceFilePaths);
+        return diagnostics.Count == 0
+            ? options
+            : options.WithExactSpecificDiagnosticOptions(options.SpecificDiagnosticOptions.SetItems(diagnostics));
+    }
 
-        var merged = options.SpecificDiagnosticOptions.SetItems(loaded);
-        if (merged == options.SpecificDiagnosticOptions)
-            return options;
+    public static CompilationOptions ApplyOptions(
+        CompilationOptions options,
+        string? projectOrSourcePath,
+        IEnumerable<string?> sourceFilePaths)
+    {
+        ArgumentNullException.ThrowIfNull(options);
 
-        return options.WithExactSpecificDiagnosticOptions(merged);
+        var sourcePaths = sourceFilePaths.ToArray();
+        var generatedCode = LoadGeneratedCodeOptions(projectOrSourcePath, sourcePaths);
+        var result = ApplyDiagnosticSeverityOptions(options, projectOrSourcePath, sourcePaths);
+        if (!GeneratedCodeOptionsEqual(result.GeneratedCodeOptions, generatedCode))
+            result = result.WithGeneratedCodeOptions(generatedCode);
+
+        return result;
     }
 
     public static ImmutableDictionary<string, ReportDiagnostic> LoadDiagnosticSeverityOptions(
@@ -60,21 +71,44 @@ public static class EditorConfigDiagnosticOptions
         var merged = ImmutableDictionary.Create<string, ReportDiagnostic>(StringComparer.OrdinalIgnoreCase);
         foreach (var sourcePath in normalizedSourcePaths)
         {
-            var forPath = LoadForSourcePath(sourcePath);
-            if (forPath.Count != 0)
-                merged = merged.SetItems(forPath);
+            foreach (var (key, value) in LoadPropertiesForSourcePath(sourcePath))
+            {
+                if (TryParseDiagnosticOption(key, value, out var id, out var option))
+                    merged = merged.SetItem(id, option);
+            }
         }
 
         return merged;
     }
 
-    private static ImmutableDictionary<string, ReportDiagnostic> LoadForSourcePath(string sourcePath)
+    public static ImmutableDictionary<string, bool> LoadGeneratedCodeOptions(
+        string? projectOrSourcePath,
+        IEnumerable<string?> sourceFilePaths)
+    {
+        ArgumentNullException.ThrowIfNull(sourceFilePaths);
+        _ = projectOrSourcePath;
+
+        var result = ImmutableDictionary.CreateBuilder<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var sourcePath in sourceFilePaths
+                     .Where(static path => !string.IsNullOrWhiteSpace(path))
+                     .Select(static path => Path.GetFullPath(path!))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var properties = LoadPropertiesForSourcePath(sourcePath);
+            if (properties.TryGetValue("generated_code", out var value) && bool.TryParse(value, out var isGenerated))
+                result[sourcePath] = isGenerated;
+        }
+
+        return result.ToImmutable();
+    }
+
+    private static ImmutableDictionary<string, string> LoadPropertiesForSourcePath(string sourcePath)
     {
         var applicableFiles = DiscoverApplicableEditorConfigs(sourcePath);
         if (applicableFiles.Count == 0)
-            return ImmutableDictionary<string, ReportDiagnostic>.Empty;
+            return ImmutableDictionary<string, string>.Empty;
 
-        var result = ImmutableDictionary.CreateBuilder<string, ReportDiagnostic>(StringComparer.OrdinalIgnoreCase);
+        var result = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in applicableFiles)
         {
             var relativePath = NormalizePath(Path.GetRelativePath(file.DirectoryPath, sourcePath));
@@ -86,14 +120,20 @@ public static class EditorConfigDiagnosticOptions
                     continue;
 
                 foreach (var (key, value) in section.Properties)
-                {
-                    if (TryParseDiagnosticOption(key, value, out var id, out var option))
-                        result[id] = option;
-                }
+                    result[key] = value;
             }
         }
 
         return result.ToImmutable();
+    }
+
+    private static bool GeneratedCodeOptionsEqual(
+        ImmutableDictionary<string, bool> left,
+        ImmutableDictionary<string, bool> right)
+    {
+        if (left.Count != right.Count)
+            return false;
+        return left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value);
     }
 
     private static List<ParsedEditorConfig> DiscoverApplicableEditorConfigs(string sourcePath)

@@ -1814,6 +1814,83 @@ dotnet_diagnostic.RAV9034.severity = error
     }
 
     [Fact]
+    public void ApplyEditorConfigDiagnosticOptionsForWatchedFileChanges_UpdatesGeneratedCodeWithoutReload()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        WriteProject(_tempRoot, "App", """
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="src/**/*.rvn" />
+  </ItemGroup>
+</Project>
+""");
+        var sourcePath = Path.Combine(_tempRoot, "src", "main.rvn");
+        WriteRavenFile(sourcePath, "func Main() -> unit { }");
+        var editorConfigPath = Path.Combine(_tempRoot, ".editorconfig");
+        File.WriteAllText(editorConfigPath, """
+root = true
+
+[*.rvn]
+generated_code = true
+""");
+
+        var projectSystem = new CountingProjectSystemService(new MsBuildProjectSystemService());
+        var workspace = RavenWorkspace.Create(targetFramework: "net10.0", projectSystemService: projectSystem);
+        var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
+        manager.Initialize(new InitializeParams
+        {
+            WorkspaceFolders = new Container<WorkspaceFolder>(new WorkspaceFolder
+            {
+                Name = "temp",
+                Uri = DocumentUri.FromFileSystemPath(_tempRoot)
+            })
+        });
+
+        projectSystem.OpenAttempts.ShouldBe(1);
+        var projectId = manager.GetProjectsSnapshot().Single().Id;
+        var analyzer = new GeneratedCodeOptOutAnalyzer();
+        var project = manager.GetProjectsSnapshot().Single()
+            .AddAnalyzerReference(new AnalyzerReference(analyzer));
+        workspace.TryApplyChanges(project.Solution).ShouldBeTrue();
+        workspace.GetDiagnostics(projectId).ShouldNotContain(diagnostic => diagnostic.Id == "AN9070");
+
+        File.WriteAllText(editorConfigPath, """
+root = true
+
+[*.rvn]
+generated_code = false
+""");
+
+        _ = manager.ApplyEditorConfigDiagnosticOptionsForWatchedFileChanges([
+            new FileEvent
+            {
+                Uri = DocumentUri.FromFileSystemPath(editorConfigPath),
+                Type = FileChangeType.Changed
+            }
+        ]);
+
+        projectSystem.OpenAttempts.ShouldBe(1);
+        manager.GetProjectsSnapshot().Single().Id.ShouldBe(projectId);
+        workspace.GetDiagnostics(projectId).ShouldContain(diagnostic => diagnostic.Id == "AN9070");
+    }
+
+    private sealed class GeneratedCodeOptOutAnalyzer : DiagnosticAnalyzer
+    {
+        private static readonly DiagnosticDescriptor Rule = DiagnosticDescriptor.Create(
+            "AN9070", "EditorConfig generated code", null, "", "EditorConfig generated code", "Testing", Raven.CodeAnalysis.DiagnosticSeverity.Warning);
+
+        public override void Initialize(AnalysisContext context)
+        {
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterSyntaxTreeAction(action =>
+                action.ReportDiagnostic(Raven.CodeAnalysis.Diagnostic.Create(Rule, Raven.CodeAnalysis.Location.None)));
+        }
+    }
+
+    [Fact]
     public async Task UpdatingMacroProjectDocument_RefreshesConsumingProjectMacroExpansionAsync()
     {
         Directory.CreateDirectory(_tempRoot);

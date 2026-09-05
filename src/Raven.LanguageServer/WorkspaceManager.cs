@@ -72,6 +72,7 @@ internal sealed class WorkspaceManager
     private readonly Dictionary<string, FailedProjectOpen> _failedProjectOpens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _semanticDiagnosticsBlockedRoots = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<ProjectId, ImmutableDictionary<string, ReportDiagnostic>> _editorConfigDiagnosticOptionsByProject = new();
+    private readonly Dictionary<ProjectId, ImmutableDictionary<string, bool>> _editorConfigGeneratedCodeOptionsByProject = new();
     private readonly PerformanceInstrumentation _compilerPerformanceInstrumentation = new();
     private ImmutableArray<string> _workspaceRoots = ImmutableArray<string>.Empty;
     private ProjectId? _fallbackProjectId;
@@ -114,6 +115,7 @@ internal sealed class WorkspaceManager
             _fileApplicationProjectsByRoot.Clear();
             _semanticDiagnosticsBlockedRoots.Clear();
             _editorConfigDiagnosticOptionsByProject.Clear();
+            _editorConfigGeneratedCodeOptionsByProject.Clear();
             _fallbackProjectId = null;
             _documents.Clear();
             _openDocumentUris.Clear();
@@ -207,6 +209,7 @@ internal sealed class WorkspaceManager
             _fileApplicationProjectsByRoot.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase),
             _semanticDiagnosticsBlockedRoots.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
             _editorConfigDiagnosticOptionsByProject.ToImmutableDictionary(),
+            _editorConfigGeneratedCodeOptionsByProject.ToImmutableDictionary(),
             _documents.ToImmutableDictionary(),
             _fallbackProjectId);
 
@@ -242,6 +245,10 @@ internal sealed class WorkspaceManager
         _editorConfigDiagnosticOptionsByProject.Clear();
         foreach (var pair in snapshot.EditorConfigDiagnosticOptionsByProject)
             _editorConfigDiagnosticOptionsByProject.Add(pair.Key, pair.Value);
+
+        _editorConfigGeneratedCodeOptionsByProject.Clear();
+        foreach (var pair in snapshot.EditorConfigGeneratedCodeOptionsByProject)
+            _editorConfigGeneratedCodeOptionsByProject.Add(pair.Key, pair.Value);
 
         _documents.Clear();
         foreach (var pair in snapshot.Documents)
@@ -317,18 +324,24 @@ internal sealed class WorkspaceManager
             {
                 var previousOptions = GetTrackedEditorConfigDiagnosticOptions(project);
                 var currentOptions = LoadEditorConfigDiagnosticOptions(project);
+                var previousGeneratedCode = GetTrackedEditorConfigGeneratedCodeOptions(project);
+                var currentGeneratedCode = LoadEditorConfigGeneratedCodeOptions(project);
 
-                if (DiagnosticOptionsEqual(previousOptions, currentOptions))
+                if (DiagnosticOptionsEqual(previousOptions, currentOptions) &&
+                    GeneratedCodeOptionsEqual(previousGeneratedCode, currentGeneratedCode))
                     continue;
 
                 var compilationOptions = project.CompilationOptions ?? new CompilationOptions(OutputKind.ConsoleApplication);
                 var mergedSpecificOptions = compilationOptions.SpecificDiagnosticOptions
                     .RemoveRange(previousOptions.Keys)
                     .SetItems(currentOptions);
-                var updatedOptions = compilationOptions.WithExactSpecificDiagnosticOptions(mergedSpecificOptions);
+                var updatedOptions = compilationOptions
+                    .WithExactSpecificDiagnosticOptions(mergedSpecificOptions)
+                    .WithGeneratedCodeOptions(currentGeneratedCode);
 
                 solution = solution.WithCompilationOptions(project.Id, updatedOptions);
                 _editorConfigDiagnosticOptionsByProject[project.Id] = currentOptions;
+                _editorConfigGeneratedCodeOptionsByProject[project.Id] = currentGeneratedCode;
                 changed = true;
             }
 
@@ -851,6 +864,16 @@ internal sealed class WorkspaceManager
         return options;
     }
 
+    private ImmutableDictionary<string, bool> GetTrackedEditorConfigGeneratedCodeOptions(Project project)
+    {
+        if (_editorConfigGeneratedCodeOptionsByProject.TryGetValue(project.Id, out var options))
+            return options;
+
+        options = LoadEditorConfigGeneratedCodeOptions(project);
+        _editorConfigGeneratedCodeOptionsByProject[project.Id] = options;
+        return options;
+    }
+
     private void ApplyInitialEditorConfigDiagnosticOptions(ProjectId projectId)
     {
         var project = _workspace.CurrentSolution.GetProject(projectId);
@@ -858,23 +881,33 @@ internal sealed class WorkspaceManager
             return;
 
         var editorConfigOptions = LoadEditorConfigDiagnosticOptions(project);
+        var generatedCodeOptions = LoadEditorConfigGeneratedCodeOptions(project);
         _editorConfigDiagnosticOptionsByProject[projectId] = editorConfigOptions;
+        _editorConfigGeneratedCodeOptionsByProject[projectId] = generatedCodeOptions;
 
-        if (editorConfigOptions.Count == 0)
+        if (editorConfigOptions.Count == 0 && generatedCodeOptions.Count == 0)
             return;
 
         var compilationOptions = project.CompilationOptions ?? new CompilationOptions(OutputKind.ConsoleApplication);
         var mergedSpecificOptions = compilationOptions.SpecificDiagnosticOptions.SetItems(editorConfigOptions);
-        if (DiagnosticOptionsEqual(compilationOptions.SpecificDiagnosticOptions, mergedSpecificOptions))
+        if (DiagnosticOptionsEqual(compilationOptions.SpecificDiagnosticOptions, mergedSpecificOptions) &&
+            GeneratedCodeOptionsEqual(compilationOptions.GeneratedCodeOptions, generatedCodeOptions))
             return;
 
         _workspace.TryApplyChanges(_workspace.CurrentSolution.WithCompilationOptions(
             projectId,
-            compilationOptions.WithExactSpecificDiagnosticOptions(mergedSpecificOptions)));
+            compilationOptions
+                .WithExactSpecificDiagnosticOptions(mergedSpecificOptions)
+                .WithGeneratedCodeOptions(generatedCodeOptions)));
     }
 
     private static ImmutableDictionary<string, ReportDiagnostic> LoadEditorConfigDiagnosticOptions(Project project)
         => EditorConfigDiagnosticOptions.LoadDiagnosticSeverityOptions(
+            project.FilePath,
+            project.Documents.Select(static document => document.FilePath));
+
+    private static ImmutableDictionary<string, bool> LoadEditorConfigGeneratedCodeOptions(Project project)
+        => EditorConfigDiagnosticOptions.LoadGeneratedCodeOptions(
             project.FilePath,
             project.Documents.Select(static document => document.FilePath));
 
@@ -892,6 +925,15 @@ internal sealed class WorkspaceManager
         }
 
         return true;
+    }
+
+    private static bool GeneratedCodeOptionsEqual(
+        ImmutableDictionary<string, bool> left,
+        ImmutableDictionary<string, bool> right)
+    {
+        if (left.Count != right.Count)
+            return false;
+        return left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value);
     }
 
     private static bool IsWorkspaceDiscoveryDirectoryExcluded(string path)
@@ -2734,6 +2776,7 @@ internal sealed class WorkspaceManager
         ImmutableDictionary<string, ProjectId> FileApplicationProjectsByRoot,
         ImmutableHashSet<string> SemanticDiagnosticsBlockedRoots,
         ImmutableDictionary<ProjectId, ImmutableDictionary<string, ReportDiagnostic>> EditorConfigDiagnosticOptionsByProject,
+        ImmutableDictionary<ProjectId, ImmutableDictionary<string, bool>> EditorConfigGeneratedCodeOptionsByProject,
         ImmutableDictionary<DocumentUri, OwnedDocument> Documents,
         ProjectId? FallbackProjectId);
     private readonly record struct FailedProjectOpen(DateTimeOffset NextRetryUtc, string FailureType);

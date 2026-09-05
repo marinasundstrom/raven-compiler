@@ -249,3 +249,10 @@ part carries the attribute, while an individually attributed member remains
 generated. Compiler diagnostics and source suppression directives retain their
 existing behavior. Configuration is published only after analyzer initialization
 succeeds.
+
+Per-file `.editorconfig` entries can explicitly set `generated_code = true` or
+`false`. These values override filename and header conventions and are carried in
+the immutable compilation snapshot used by analyzer callbacks. A watched
+`.editorconfig` change updates project options, invalidates cached analyzer
+results, and republishes diagnostics for affected open documents without a full
+project reload.

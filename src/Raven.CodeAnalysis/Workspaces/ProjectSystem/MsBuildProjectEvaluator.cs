@@ -232,7 +232,7 @@ internal static class MsBuildProjectEvaluator
         if (returnedValueHandling is { } returnedValueHandlingMode)
             compilationOptions = compilationOptions.WithReturnedValueHandlingMode(returnedValueHandlingMode);
 
-        compilationOptions = EditorConfigDiagnosticOptions.ApplyDiagnosticSeverityOptions(
+        compilationOptions = EditorConfigDiagnosticOptions.ApplyOptions(
             compilationOptions,
             projectFilePath,
             documents.Select(static document => document.FilePath));

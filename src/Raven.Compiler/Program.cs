@@ -1267,7 +1267,7 @@ var sourceDocumentPaths = project.Documents
 var editorConfigAnchorPath = projectFileInput ?? sourceDocumentPaths.FirstOrDefault();
 if (!string.IsNullOrWhiteSpace(editorConfigAnchorPath))
 {
-    options = EditorConfigDiagnosticOptions.ApplyDiagnosticSeverityOptions(
+    options = EditorConfigDiagnosticOptions.ApplyOptions(
         options,
         editorConfigAnchorPath,
         sourceDocumentPaths);
