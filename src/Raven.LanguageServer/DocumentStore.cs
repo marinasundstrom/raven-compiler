@@ -976,7 +976,7 @@ internal sealed class DocumentStore
             else
             {
                 if (!_workspaceManager.TryGetProjectAnalyzerDiagnostics(
-                        uri,
+                        context.Value.Document,
                         context.Value.Compilation,
                         out var projectDiagnosticsWithAnalyzers,
                         cancellationToken: effectiveCancellationToken))

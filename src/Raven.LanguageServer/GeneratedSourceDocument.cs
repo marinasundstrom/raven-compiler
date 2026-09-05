@@ -5,6 +5,7 @@ using MediatR;
 
 using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 using Raven.CodeAnalysis.Syntax;
 
@@ -53,18 +54,32 @@ internal static class GeneratedSourceDocument
 }
 
 [Method("raven/generatedSource", Direction.ClientToServer)]
-internal sealed record GeneratedSourceParams : IRequest<string?>
+internal sealed record GeneratedSourceParams : IRequest<GeneratedSourceResult?>
 {
     public required DocumentUri Uri { get; init; }
 }
 
-internal sealed class GeneratedSourceHandler(DocumentStore documents) : IJsonRpcRequestHandler<GeneratedSourceParams, string?>
+internal sealed record GeneratedSourceResult
 {
-    public async Task<string?> Handle(GeneratedSourceParams request, CancellationToken cancellationToken)
+    public required string Text { get; init; }
+    public required Diagnostic[] Diagnostics { get; init; }
+}
+
+internal sealed class GeneratedSourceHandler(DocumentStore documents) : IJsonRpcRequestHandler<GeneratedSourceParams, GeneratedSourceResult?>
+{
+    public async Task<GeneratedSourceResult?> Handle(GeneratedSourceParams request, CancellationToken cancellationToken)
     {
         if (!GeneratedSourceDocument.TryParse(request.Uri, out _, out _))
             return null;
         var context = await documents.GetAnalysisContextAsync(request.Uri, cancellationToken).ConfigureAwait(false);
-        return context?.SourceText.ToString();
+        if (context is null)
+            return null;
+
+        var diagnostics = await documents.GetDiagnosticsAsync(request.Uri, cancellationToken).ConfigureAwait(false);
+        return new GeneratedSourceResult
+        {
+            Text = context.Value.SourceText.ToString(),
+            Diagnostics = diagnostics.ToArray()
+        };
     }
 }

@@ -19,6 +19,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Read-only source-generator documents now show compiler and analyzer diagnostics
+  from the current project compilation and refresh them after source edits.
+
 - Project analyzer diagnostics now include source-generated syntax trees, honor
   suppression directives in those files, and retry failed generated-tree analysis.
 

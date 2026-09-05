@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { execFile, execFileSync, ExecFileOptions } from 'child_process';
 import * as vscode from 'vscode';
 import { CloseAction, ErrorAction, InlayHintRefreshRequest, InlayHintRequest, InlayHintsProviderShape, LanguageClient, LanguageClientOptions, ServerOptions, State, StateChangeEvent, Trace } from 'vscode-languageclient/node';
+import { Diagnostic as ProtocolDiagnostic } from 'vscode-languageserver-protocol';
 import {
   ExpandedSyntaxContentProvider,
   LoadedSyntaxTree,
@@ -45,6 +46,11 @@ interface MacroEmbeddedLanguageProjectionResponse {
   languageId: string;
   text: string;
   range: LspRange;
+}
+
+interface GeneratedSourceResponse {
+  text: string;
+  diagnostics: ProtocolDiagnostic[];
 }
 
 interface OpenMacroEmbeddedDocument {
@@ -2345,9 +2351,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const generatedSourceChanged = new vscode.EventEmitter<vscode.Uri>();
+  const generatedSourceDiagnostics = vscode.languages.createDiagnosticCollection('raven-generated');
   let generatedSourceRefresh: ReturnType<typeof setTimeout> | undefined;
   context.subscriptions.push(
     generatedSourceChanged,
+    generatedSourceDiagnostics,
     { dispose: () => clearTimeout(generatedSourceRefresh) },
     vscode.workspace.registerTextDocumentContentProvider('raven-generated', {
       onDidChange: generatedSourceChanged.event,
@@ -2355,8 +2363,24 @@ export function activate(context: vscode.ExtensionContext): void {
         if (clientStartPromise) {
           await clientStartPromise;
         }
-        const text = await client?.sendRequest<string | null>('raven/generatedSource', { uri: uri.toString() }, token);
-        return text ?? '// This generated source is no longer available.\n';
+        const response = await client?.sendRequest<GeneratedSourceResponse | null>('raven/generatedSource', { uri: uri.toString() }, token);
+        if (!response) {
+          generatedSourceDiagnostics.delete(uri);
+          return '// This generated source is no longer available.\n';
+        }
+
+        const diagnostics = client
+          ? await client.protocol2CodeConverter.asDiagnostics(response.diagnostics, token)
+          : [];
+        if (!token.isCancellationRequested) {
+          generatedSourceDiagnostics.set(uri, diagnostics);
+        }
+        return response.text;
+      }
+    }),
+    vscode.workspace.onDidCloseTextDocument(document => {
+      if (document.uri.scheme === 'raven-generated') {
+        generatedSourceDiagnostics.delete(document.uri);
       }
     }),
     vscode.workspace.onDidChangeTextDocument(event => {

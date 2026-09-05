@@ -1533,6 +1533,19 @@ internal sealed class WorkspaceManager
         return false;
     }
 
+    internal bool TryGetProjectAnalyzerDiagnostics(
+        Document document,
+        Compilation compilation,
+        out ImmutableArray<CodeDiagnostic> diagnostics,
+        CompilationWithAnalyzersOptions? analyzerOptions = null,
+        CancellationToken cancellationToken = default)
+        => TryGetProjectAnalyzerDiagnostics(
+            document.Project.Id,
+            compilation,
+            out diagnostics,
+            analyzerOptions,
+            cancellationToken);
+
     public bool TryGetDocumentDiagnostics(
         DocumentUri uri,
         out ImmutableArray<CodeDiagnostic> diagnostics,
