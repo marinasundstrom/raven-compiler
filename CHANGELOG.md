@@ -6,6 +6,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Added
 
+- Generated-code analyzer policies recognize conventional generated file names and
+  leading auto-generated comments, with classification refreshed after header edits.
+
 - Analyzers can configure source-generated tree callbacks and diagnostic reporting
   independently with `ConfigureGeneratedCodeAnalysis` and `GeneratedCodeAnalysisFlags`.
   Unconfigured analyzers retain the existing analyze-and-report behavior.

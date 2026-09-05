@@ -94,10 +94,10 @@ public abstract class DiagnosticAnalyzer
     internal bool ConcurrentExecutionEnabled => _concurrentExecutionEnabled;
 
     internal bool ShouldAnalyzeTree(SyntaxTree tree)
-        => !tree.IsGenerated || (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0;
+        => !tree.IsGeneratedCode || (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.Analyze) != 0;
 
     internal bool ShouldReportDiagnostic(Diagnostic diagnostic)
-        => diagnostic.Location.SourceTree?.IsGenerated != true ||
+        => diagnostic.Location.SourceTree?.IsGeneratedCode != true ||
             (_generatedCodeAnalysis & GeneratedCodeAnalysisFlags.ReportDiagnostics) != 0;
 
     /// <summary>Runs the analyzer for the specified compilation.</summary>
