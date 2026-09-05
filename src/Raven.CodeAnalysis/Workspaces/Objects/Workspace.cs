@@ -485,6 +485,7 @@ public class Workspace
             return cachedDiagnostics;
         }
 
+        var succeeded = true;
         var diagnostics = compilation.GetDiagnostics(analyzerOptions, cancellationToken).ToHashSet();
 
         if (project.CompilationOptions?.RunAnalyzers != false)
@@ -504,7 +505,9 @@ public class Workspace
                     IEnumerable<Diagnostic> analyzerDiagnostics;
                     try
                     {
-                        analyzerDiagnostics = analyzer.Analyze(compilation, cancellationToken);
+                        var analyzerResult = analyzer.AnalyzeWithResult(compilation, syntaxTree: null, cancellationToken);
+                        succeeded &= analyzerResult.Succeeded;
+                        analyzerDiagnostics = analyzerResult.Diagnostics;
                     }
                     catch (OperationCanceledException)
                     {
@@ -512,6 +515,7 @@ public class Workspace
                     }
                     catch
                     {
+                        succeeded = false;
                         // Analyzer failures should not stop normal compilation diagnostics.
                         continue;
                     }
@@ -530,7 +534,7 @@ public class Workspace
         }
 
         var result = diagnostics.OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray();
-        if (analyzerOptions is null)
+        if (succeeded && analyzerOptions is null)
             _projectDiagnosticsCache[cacheKey] = result;
 
         return result;

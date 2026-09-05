@@ -95,10 +95,15 @@ public abstract class DiagnosticAnalyzer
 
     /// <summary>Runs the analyzer for the specified syntax tree in the compilation.</summary>
     public IEnumerable<Diagnostic> Analyze(Compilation compilation, SyntaxTree? syntaxTree, CancellationToken cancellationToken = default)
-    {
-        if (!TryEnsureInitialized())
-            return [];
+        => AnalyzeWithResult(compilation, syntaxTree, cancellationToken).Diagnostics;
 
+    internal AnalyzerDiagnosticsResult AnalyzeWithResult(Compilation compilation, SyntaxTree? syntaxTree, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryEnsureInitialized())
+            return new([], Succeeded: false);
+
+        var succeeded = true;
         var diagnostics = new List<Diagnostic>();
         var syntaxTrees = syntaxTree is null
             ? compilation.SyntaxTrees
@@ -122,6 +127,7 @@ public abstract class DiagnosticAnalyzer
             }
             catch
             {
+                succeeded = false;
                 // Analyzer failures should not stop compilation.
             }
         }
@@ -141,6 +147,7 @@ public abstract class DiagnosticAnalyzer
                 }
                 catch
                 {
+                    succeeded = false;
                     // Analyzer failures should not stop compilation.
                 }
             }
@@ -171,6 +178,7 @@ public abstract class DiagnosticAnalyzer
                         }
                         catch
                         {
+                            succeeded = false;
                             // Analyzer failures should not stop compilation.
                         }
                     }
@@ -209,6 +217,7 @@ public abstract class DiagnosticAnalyzer
                         }
                         catch
                         {
+                            succeeded = false;
                             // Analyzer failures should not stop compilation.
                         }
                     }
@@ -247,14 +256,17 @@ public abstract class DiagnosticAnalyzer
                     }
                     catch
                     {
+                        succeeded = false;
                         // Analyzer failures should not stop compilation.
                     }
                 }
             }
         }
 
-        return diagnostics.Select(diagnostic => AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, this))
-            .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance);
+        return new AnalyzerDiagnosticsResult(
+            diagnostics.Select(diagnostic => AnalyzerDiagnosticProperties.WithAnalyzerOrigin(diagnostic, this))
+                .OrderBy(static diagnostic => diagnostic, DiagnosticComparer.Instance).ToImmutableArray(),
+            succeeded);
 
         ImmutableHashSet<SymbolKind> GetRegisteredSymbolKinds()
             => _symbolActions

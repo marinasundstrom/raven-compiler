@@ -207,7 +207,9 @@ Incomplete results are not stored in the analyzer caches or published to the
 editor. The existing retry scheduler keeps the last valid analyzer diagnostics
 visible while analysis is unavailable; a successful retry replaces them,
 including clearing warnings that no longer apply. Successful sub-results can
-still be reused when retrying a failed project analysis.
+still be reused when retrying a failed project analysis. The public workspace
+`GetDiagnostics` API also caches only completed analyzer runs, so a transient
+analyzer failure does not prevent recovery on the same project snapshot.
 
 Analyzer diagnostics include `Raven.AnalyzerName` in their properties and are
 presented with the `raven-analyzer` source. This origin metadata lets the editor

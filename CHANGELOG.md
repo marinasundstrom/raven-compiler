@@ -6,6 +6,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Public workspace diagnostics now retry failed analyzer runs instead of caching
+  partial results, matching the recovery behavior of editor analysis.
+
 - Incomplete document and project analyzer runs are no longer cached or published
   as successful empty results. The editor preserves previous analyzer warnings
   through failures and cancellation, then replaces them after a successful retry.
