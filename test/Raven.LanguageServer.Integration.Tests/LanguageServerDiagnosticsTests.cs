@@ -1331,7 +1331,9 @@ func Main() -> unit {
     count
 }
 """;
-        await store.UpsertDocumentAsync(uri, code);
+        var authoredDocument = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddAnalyzerReference(
+            authoredDocument.Project.Id, new AnalyzerReference(new VarCanBeLetAnalyzer()))).ShouldBeTrue();
         var result = await store.TryGetDiagnosticsAsync(
             uri,
             DocumentStore.DiagnosticLane.ProjectWithAnalyzers,
