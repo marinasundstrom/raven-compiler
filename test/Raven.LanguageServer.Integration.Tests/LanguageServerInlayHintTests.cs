@@ -1660,7 +1660,7 @@ func Main() -> unit {
     }
 
     [Fact]
-    public async Task Handle_FullDocument_DoesNotColdBindTopLevelAsyncFunctionExpressionInitializerAsync()
+    public async Task Handle_SmallFullDocument_ShowsTopLevelAsyncFunctionExpressionLocalTypeAsync()
     {
         Directory.CreateDirectory(_tempRoot);
 
@@ -1686,7 +1686,7 @@ class RequestContext {
     public val Text: string = "body"
 }
 
-func Accept(handler: func (RequestContext) -> Task<string>) -> unit { }
+func Accept(handler: RequestContext -> Task<string>) -> unit { }
 
 Accept(async func (context: RequestContext) {
     let content = await Task.FromResult(context.Text)
@@ -1703,7 +1703,7 @@ Accept(async func (context: RequestContext) {
         }, CancellationToken.None);
         var contentInsertion = code.IndexOf("content", StringComparison.Ordinal) + "content".Length;
 
-        result.ToArray().ShouldNotContain(hint =>
+        result.ToArray().ShouldContain(hint =>
             hint.Position == PositionHelper.ToRange(sourceText, new TextSpan(contentInsertion, 0)).Start &&
             hint.Label.String == ": string");
     }
