@@ -10,7 +10,7 @@ namespace Raven.CodeAnalysis.Symbols;
 
 internal partial class PEMethodSymbol : PESymbol, IMethodSymbol
 {
-    private static readonly ConcurrentDictionary<MethodBase, ParameterInfo[]> s_parameterInfoCache = new();
+    private static readonly ConditionalWeakTable<MethodBase, ParameterInfo[]> s_parameterInfoCache = new();
     private static readonly ConcurrentDictionary<MetadataMethodKey, int> s_parameterCountCache = new();
 
     private readonly ReflectionTypeLoader _reflectionTypeLoader;
@@ -420,7 +420,7 @@ internal partial class PEMethodSymbol : PESymbol, IMethodSymbol
     {
         try
         {
-            parameterInfos = s_parameterInfoCache.GetOrAdd(_methodInfo, static method => method.GetParameters());
+            parameterInfos = s_parameterInfoCache.GetValue(_methodInfo, static method => method.GetParameters());
             CacheParameterCount(parameterInfos.Length);
             return true;
         }

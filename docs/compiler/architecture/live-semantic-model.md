@@ -197,6 +197,18 @@ A request cannot hold one document's semantic gate while another declaration
 pass needs it. After declaration initialization, documents retain independent
 semantic gates. Async callers establish ambient initialization ownership alongside
 their semantic lease; background try-acquire paths remain non-blocking.
+On runtimes without multithreading, both declaration and semantic access skip
+semaphore acquisition while still honoring cancellation. In particular, the
+single-threaded WebAssembly compiler worker cannot call synchronous semaphore
+waits, even when the semaphore is available.
+
+Incremental reuse retains only compilation-independent metadata and declaration
+state, never the previous compilation itself. Superseded editor compilations and
+their bound symbols must remain eligible for garbage collection. Portable reference
+fingerprints still determine whether a metadata context is safe to reuse. This
+metadata reuse remains valid when parser recovery requires all source semantic
+state to be rebuilt. Process-wide reflection caches must also use weak keys
+when their keys would otherwise retain discarded metadata contexts.
 
 ## Language Server Scheduling
 

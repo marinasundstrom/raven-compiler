@@ -23,6 +23,7 @@ on:
       - "src/Raven.Macros/**"
       - "src/RavenDoc/**"
       - "src/Raven.Playground/**"
+      - "src/Raven.Playground.Worker/**"
       - "samples/projects/macro-html-blazor/**"
       - "tools/**Generator/**"
   workflow_dispatch:
@@ -76,6 +77,11 @@ jobs:
 
       - name: Add playground
         run: scripts/build-playground-site.sh
+
+      - name: Test published Playground in WebAssembly
+        run: |
+          src/Raven.Playground/node_modules/.bin/playwright install --with-deps chromium
+          npm --prefix src/Raven.Playground run test:browser -- "$GITHUB_WORKSPACE/_site/playground"
 
       - name: Add experimental component-template showcase
         run: scripts/build-html-macro-site.sh

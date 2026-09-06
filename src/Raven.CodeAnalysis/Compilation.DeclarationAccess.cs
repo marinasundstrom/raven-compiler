@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,6 +16,15 @@ public partial class Compilation
     // two paths cannot take the declaration and document locks in opposite orders.
     internal IDisposable? EnterSourceDeclarationAccess(CancellationToken cancellationToken, bool tryEnter = false)
     {
+#if NET11_0_OR_GREATER
+        // Browser workers without threads cannot use synchronous semaphore waits,
+        // even when the semaphore is available. No cross-thread exclusion is needed.
+        if (!RuntimeFeature.IsMultithreadingSupported)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return SourceDeclarationAccessLease.Empty;
+        }
+#endif
         if (_sourceDeclarationsComplete || _sourceDeclarationAccessDepth.Value > 0)
             return SourceDeclarationAccessLease.Empty;
 
@@ -41,6 +51,13 @@ public partial class Compilation
 
     internal async ValueTask<IDisposable?> EnterSourceDeclarationAccessAsync(CancellationToken cancellationToken, bool tryEnter = false)
     {
+#if NET11_0_OR_GREATER
+        if (!RuntimeFeature.IsMultithreadingSupported)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return SourceDeclarationAccessLease.Empty;
+        }
+#endif
         if (_sourceDeclarationsComplete || _sourceDeclarationAccessDepth.Value > 0)
             return SourceDeclarationAccessLease.Empty;
 

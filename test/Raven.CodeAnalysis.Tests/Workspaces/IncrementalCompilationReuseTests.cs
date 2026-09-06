@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 using Raven.CodeAnalysis.Symbols;
 using Raven.CodeAnalysis.Syntax;
@@ -9,6 +10,106 @@ namespace Raven.CodeAnalysis.Tests.Workspaces;
 
 public sealed class IncrementalCompilationReuseTests
 {
+    [Fact]
+    public void MetadataParameterQueries_DoNotRetainDiscardedMetadataContext()
+    {
+        var metadataContext = QueryMetadataParameters();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(metadataContext.IsAlive);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference QueryMetadataParameters()
+    {
+        var compilation = Compilation.Create("test", syntaxTrees: [], references: TestMetadataReferences.Default);
+        var type = compilation.GetTypeByMetadataName("System.String")!;
+        var methods = type.GetMembers("Substring").OfType<IMethodSymbol>().ToArray();
+        Assert.NotEmpty(methods);
+        foreach (var method in methods)
+            Assert.NotEmpty(method.Parameters);
+        return new WeakReference(GetMetadataLoadContext(compilation));
+    }
+
+    [Theory]
+    [InlineData("class Before {}\n")]
+    [InlineData("class Before { func Value( }")]
+    public void WorkspaceCompilation_ReusesMetadata_WhenSemanticStateMustBeRebuilt(string source)
+    {
+        var workspace = new AdhocWorkspace();
+        var project = workspace.CurrentSolution.AddProject("test", compilationOptions:
+            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary)).Projects.Single();
+        foreach (var reference in TestMetadataReferences.Default)
+            project = project.AddMetadataReference(reference);
+        var document = project.AddDocument("main.rvn", SourceText.From("class Before {}"));
+        workspace.TryApplyChanges(document.Project.Solution);
+        var previous = workspace.GetCompilation(document.Project.Id);
+        _ = previous.GetDiagnostics();
+
+        workspace.TryApplyChanges(workspace.CurrentSolution.WithDocumentText(document.Id, SourceText.From(source)));
+        var current = workspace.GetCompilation(document.Project.Id);
+        Assert.True(IncrementalExecutableOwnerAnalyzer.Analyze(
+            previous.SyntaxTrees.Single(), current.SyntaxTrees.Single()).RequiresFullSemanticRebind);
+        var diagnostics = current.GetDiagnostics();
+        var cold = Compilation.Create("test", [SyntaxTree.ParseText(source)], TestMetadataReferences.Default,
+            options: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Equal(cold.GetDiagnostics().Select(diagnostic => diagnostic.ToString()),
+            diagnostics.Select(diagnostic => diagnostic.ToString()));
+        Assert.Same(GetMetadataLoadContext(previous), GetMetadataLoadContext(current));
+    }
+
+    [Fact]
+    public void WorkspaceCompilation_ReusesMetadata_AfterReplacingSourceDeclarations()
+    {
+        var workspace = new AdhocWorkspace();
+        var project = workspace.CurrentSolution.AddProject("test", compilationOptions:
+            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary)).Projects.Single();
+        foreach (var reference in TestMetadataReferences.Default)
+            project = project.AddMetadataReference(reference);
+        var document = project.AddDocument("main.rvn", SourceText.From("class Before {}"));
+        workspace.TryApplyChanges(document.Project.Solution);
+        var previous = workspace.GetCompilation(document.Project.Id);
+        Assert.NotNull(previous.GetTypeByMetadataName("Before"));
+
+        workspace.TryApplyChanges(workspace.CurrentSolution.WithDocumentText(
+            document.Id, SourceText.From("class After { func Value() -> int { return 42 } }")));
+        var current = workspace.GetCompilation(document.Project.Id);
+        Assert.NotNull(current.GetTypeByMetadataName("After"));
+        Assert.Null(current.GetTypeByMetadataName("Before"));
+        Assert.Empty(current.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Same(GetMetadataLoadContext(previous), GetMetadataLoadContext(current));
+    }
+
+    [Fact]
+    public void IncrementalCompilation_DoesNotRetainPreviousCompilation()
+    {
+        var (current, previous) = CreateIncrementalCompilation();
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.False(previous.IsAlive);
+        Assert.Empty(current.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        GC.KeepAlive(current);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (Compilation Current, WeakReference Previous) CreateIncrementalCompilation()
+    {
+        var tree = SyntaxTree.ParseText("class Widget {}");
+        var previous = Compilation.Create("test", [tree], TestMetadataReferences.Default, options: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        previous.EnsureSetup();
+        _ = previous.DeclarationTable;
+        var current = Compilation.Create("test", [tree], TestMetadataReferences.Default, options: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        current.AdoptIncrementalReuseFrom(previous);
+        current.EnsureSetup();
+        _ = current.DeclarationTable;
+        Assert.Same(GetMetadataLoadContext(previous), GetMetadataLoadContext(current));
+        return (current, new WeakReference(previous));
+    }
+
     [Fact]
     public void DeclarationTable_RejectsDetachedSyntaxNodes()
     {

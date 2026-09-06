@@ -4,6 +4,18 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ## Unreleased
 
+### Fixed
+
+- Playground compilation works on single-threaded WebAssembly again: declaration
+  access avoids unsupported semaphore waits while preserving cancellation checks.
+- Incremental compilations no longer keep a chain of earlier compilations alive
+  when reusing metadata and declaration state during editing. Unchanged reference
+  metadata also remains reusable through parser recovery and full semantic rebuilds.
+- Metadata method-parameter caching no longer prevents discarded reference
+  assemblies and their metadata contexts from being garbage collected.
+- Website publication now requires the Playground browser smoke suite, including
+  a cold compile-and-run before any editor semantic queries.
+
 ### Breaking changes
 
 - None recorded.

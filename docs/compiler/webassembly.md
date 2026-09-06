@@ -132,6 +132,11 @@ synthesized record equality, emitted-assembly loading, and execution of every
 registered example. Its first run installs the pinned Playwright Chromium
 build.
 
+The test runs Hello World in a cold compiler worker before other editor queries
+can initialize declarations. The website workflow runs this suite against the
+published Playground files before deployment, so a successful static build alone
+cannot allow a broken browser compiler to be published.
+
 Browser and WASI hosts expose different platform APIs. Target profiles should
 describe those capabilities explicitly, and unavailable APIs should be handled
 through normal target-framework reference surfaces and compiler diagnostics.

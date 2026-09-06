@@ -23,9 +23,13 @@ public partial class Compilation
         // bodies require a genuinely fresh semantic compilation. Reusing
         // metadata symbols, declaration tables, or owner-relative descriptors
         // here can make an undo retain stale overrides or lose top-level
-        // declarations. Other edits continue through the fine-grained path.
+        // declarations. Unchanged reference metadata is independent of source
+        // binding and remains reusable even for a complete source replacement.
         if (changedTreeRequiresFullSemanticRebind)
+        {
+            AdoptMetadataReuseFrom(previousCompilation);
             return;
+        }
 
         InitializeIncrementalState(previousCompilation.CreateIncrementalState(
             plan.ReusedSyntaxTrees,

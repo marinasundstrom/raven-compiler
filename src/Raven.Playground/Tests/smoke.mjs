@@ -91,9 +91,17 @@ try {
   await page.goto(url);
   await page.getByText("Ready", { exact: true }).waitFor({ timeout: 30_000 });
 
+  // Exercise a cold compiler worker before hover or other semantic queries can
+  // initialize declarations. WebAssembly without threads must never enter a
+  // blocking declaration semaphore, including on the first Emit call.
+  await page.getByRole("button", { name: /^Run/ }).click();
+  await waitForSuccessfulRun(page, "the cold Hello World example");
+  await page.getByText("Hello from Raven in WebAssembly", { exact: true }).waitFor();
+
   const playgroundBrandHref = await page.locator(".raven-brand").getAttribute("href");
-  if (playgroundBrandHref !== "./") {
-    throw new Error(`Expected standalone Playground brand href './', got '${playgroundBrandHref}'.`);
+  const expectedBrandHref = JSON.parse(readFileSync(join(siteRoot, "appsettings.json"), "utf8")).RavenSiteRootHref;
+  if (playgroundBrandHref !== expectedBrandHref) {
+    throw new Error(`Expected Playground brand href '${expectedBrandHref}', got '${playgroundBrandHref}'.`);
   }
 
   const themeResponse = await page.request.get(`${url}css/raven-theme.css`);
@@ -533,9 +541,11 @@ try {
     if (exampleStatus !== "Complete") {
       const output = await page.locator(".output-panel").textContent();
       throw new Error(
-        `Expected example '${example.id}' to run, got ${exampleStatus}: ${output}`,
+        `Expected example '${example.id}' to run, got ${exampleStatus}: ${output}\n` +
+        `Browser errors:\n${browserErrors.join("\n") || "<none>"}`,
       );
     }
+    console.log(`Passed example '${example.id}'.`);
   }
 
   await page.keyboard.press("Escape");

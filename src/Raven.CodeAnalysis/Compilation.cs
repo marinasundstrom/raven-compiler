@@ -70,7 +70,9 @@ public partial class Compilation
     private readonly Dictionary<string, SynthesizedNamespaceMembersClassSymbol> _namespaceMembersContainers = new(StringComparer.Ordinal);
     private BoundNodeFactory? _boundNodeFactory;
     private DeclarationTable? _declarationTable;
-    private Compilation? _previousCompilationForReuse;
+    private DeclarationTable? _previousDeclarationTableForReuse;
+    private MetadataLoadContext? _previousMetadataLoadContextForReuse;
+    private IReadOnlyDictionary<string, PortableReferenceFingerprint>? _previousPortableReferenceFingerprints;
     private ErrorSymbol _errorSymbol;
     private bool isSettingUp;
     private int _setupThreadId;
@@ -894,7 +896,19 @@ public partial class Compilation
         if (ReferenceEquals(this, previousCompilation))
             return;
 
-        _previousCompilationForReuse = previousCompilation;
+        // Retain only reusable, compilation-independent state. Keeping the whole
+        // compilation here roots every earlier editor snapshot and its symbols.
+        _previousDeclarationTableForReuse = previousCompilation._declarationTable;
+        AdoptMetadataReuseFrom(previousCompilation);
+    }
+
+    private void AdoptMetadataReuseFrom(Compilation previousCompilation)
+    {
+        if (previousCompilation.setup)
+        {
+            _previousMetadataLoadContextForReuse = previousCompilation._metadataLoadContext;
+            _previousPortableReferenceFingerprints = previousCompilation._portableReferenceFingerprints;
+        }
     }
 
     internal void EnsureSetup()
@@ -961,6 +975,8 @@ public partial class Compilation
         _metadataLoadContext = TryReuseMetadataLoadContext(_portableReferenceFingerprints, out var reusedMetadataLoadContext)
             ? reusedMetadataLoadContext
             : CreateMetadataLoadContext(paths, coreAssemblyName);
+        _previousMetadataLoadContextForReuse = null;
+        _previousPortableReferenceFingerprints = null;
 
         CoreAssembly = _metadataLoadContext.CoreAssembly!;
         EmitCoreAssembly = ResolveEmitCoreAssembly() ?? RuntimeCoreAssembly;
@@ -1034,23 +1050,20 @@ public partial class Compilation
         out MetadataLoadContext metadataLoadContext)
     {
         metadataLoadContext = null!;
-        var previousCompilation = _previousCompilationForReuse;
-        if (previousCompilation is null ||
-            !previousCompilation.setup ||
-            !HaveEquivalentPortableReferences(previousCompilation, currentFingerprints))
+        if (_previousMetadataLoadContextForReuse is null ||
+            !HaveEquivalentPortableReferences(currentFingerprints))
         {
             return false;
         }
 
-        metadataLoadContext = previousCompilation._metadataLoadContext;
+        metadataLoadContext = _previousMetadataLoadContextForReuse;
         return true;
     }
 
     private bool HaveEquivalentPortableReferences(
-        Compilation previousCompilation,
         IReadOnlyDictionary<string, PortableReferenceFingerprint> currentFingerprints)
     {
-        var previousFingerprints = previousCompilation._portableReferenceFingerprints;
+        var previousFingerprints = _previousPortableReferenceFingerprints;
         if (previousFingerprints is null || previousFingerprints.Count != currentFingerprints.Count)
             return false;
 
@@ -1094,9 +1107,9 @@ public partial class Compilation
 
         lock (_declarationTableGate)
         {
-            return _declarationTable ??= new DeclarationTable(
-                SyntaxTrees,
-                _previousCompilationForReuse?._declarationTable);
+            _declarationTable ??= new DeclarationTable(SyntaxTrees, _previousDeclarationTableForReuse);
+            _previousDeclarationTableForReuse = null;
+            return _declarationTable;
         }
     }
 
