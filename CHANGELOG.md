@@ -26,6 +26,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Constant hovers show `const` declarations and identify them as constants,
+  including namespace-level `extern const` values.
+
 - Opening a source file in a nested project omitted from the workspace solution
   now loads its containing project on demand, restoring sibling type lookup
   while respecting evaluated compile exclusions.

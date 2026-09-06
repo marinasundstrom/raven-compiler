@@ -4540,6 +4540,9 @@ internal sealed class HoverHandler : IHoverHandler
         if (symbol is IMethodSymbol { MethodKind: MethodKind.Constructor })
             return "Constructor";
 
+        if (symbol is IFieldSymbol { IsConst: true } or ILocalSymbol { IsConst: true })
+            return "Constant";
+
         return symbol.Kind.ToString();
     }
 

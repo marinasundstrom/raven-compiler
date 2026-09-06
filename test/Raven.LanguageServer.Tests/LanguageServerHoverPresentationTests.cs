@@ -22,6 +22,21 @@ namespace Raven.LanguageServer.Tests;
 public class LanguageServerHoverPresentationTests
 {
     [Fact]
+    public void ExternConstantHover_UsesConstantSignatureAndKind()
+    {
+        var tree = SyntaxTree.ParseText("extern const LedPin: int = 25");
+        var compilation = Compilation.Create("test", [tree], [.. LanguageServerTestReferences.Default],
+            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<VariableDeclaratorSyntax>().Single();
+        var symbol = model.GetDeclaredSymbol(syntax).ShouldBeAssignableTo<IFieldSymbol>();
+        var signatureMethod = typeof(HoverHandler).GetMethod("BuildSignature", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var kindMethod = typeof(HoverHandler).GetMethod("BuildKindDisplay", BindingFlags.NonPublic | BindingFlags.Static)!;
+        ((string)signatureMethod.Invoke(null, [symbol, syntax, model])!).ShouldBe("extern const LedPin: int = 25");
+        ((string)kindMethod.Invoke(null, [symbol])!).ShouldBe("Constant");
+    }
+
+    [Fact]
     public void DeclarationMacroHover_ResolvesHeaderParameterInsideBlockFragment()
     {
         const string code = """
@@ -108,7 +123,7 @@ enum PinEventTypes {
 
         var signature = (string)buildSignature.Invoke(null, [symbol, member, semanticModel])!;
 
-        signature.ShouldBe("const field Rising: PinEventTypes = 1");
+        signature.ShouldBe("const Rising: PinEventTypes = 1");
     }
 
     [Fact]

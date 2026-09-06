@@ -42,7 +42,7 @@ class C {
         var field = Assert.IsAssignableFrom<IFieldSymbol>(model.GetDeclaredSymbol(declarator));
 
         field.ToDisplayString(SymbolDisplayFormat.RavenSignatureFormat)
-            .ShouldBe("extern const field LedPin: int = 25");
+            .ShouldBe("extern const LedPin: int = 25");
     }
 
     [Fact]
@@ -65,7 +65,7 @@ enum PinEventTypes {
         var field = Assert.Single(enumType.GetMembers("Rising").OfType<IFieldSymbol>());
 
         field.ToDisplayString(SymbolDisplayFormat.RavenSignatureFormat)
-            .ShouldBe("const field Rising: PinEventTypes = 1");
+            .ShouldBe("const Rising: PinEventTypes = 1");
     }
 
     [Fact]

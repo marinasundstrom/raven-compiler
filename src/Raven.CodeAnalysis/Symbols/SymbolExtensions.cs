@@ -1976,6 +1976,7 @@ public static partial class SymbolExtensions
         return symbol switch
         {
             ITypeSymbol { IsUnionCase: true } => "case",
+            IFieldSymbol { IsConst: true } => null,
             IFieldSymbol => "field",
             IPropertySymbol property => property.IsMutable ? "var" : "val",
             IEventSymbol => "event",
