@@ -30,6 +30,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Fixed
 
+- Core generation defines its union metadata attributes even when the compiler
+  host already has Raven.Core loaded, preserving case binding after a rebuild.
+
 - Constant hovers show `const` declarations and identify them as constants,
   including namespace-level `extern const` values.
 

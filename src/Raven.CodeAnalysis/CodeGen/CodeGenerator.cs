@@ -1002,7 +1002,9 @@ internal class CodeGenerator
         if (RavenUnionCaseAttributeType is not null)
             return;
 
-        RavenUnionCaseAttributeType = Compilation.ResolveRuntimeType("Raven.Runtime.CompilerServices.RavenUnionCaseAttribute");
+        RavenUnionCaseAttributeType = TargetRuntimeTypeExists("Raven.Runtime.CompilerServices.RavenUnionCaseAttribute")
+            ? Compilation.ResolveRuntimeType("Raven.Runtime.CompilerServices.RavenUnionCaseAttribute")
+            : null;
         if (RavenUnionCaseAttributeType is not null)
         {
             _ravenUnionCaseCtor = RavenUnionCaseAttributeType.GetConstructor(new[] { typeof(string), typeof(string), typeof(int) });
@@ -1076,7 +1078,9 @@ internal class CodeGenerator
         if (RavenUnionCompanionAttributeType is not null)
             return;
 
-        RavenUnionCompanionAttributeType = Compilation.ResolveRuntimeType("Raven.Runtime.CompilerServices.RavenUnionCompanionAttribute");
+        RavenUnionCompanionAttributeType = TargetRuntimeTypeExists("Raven.Runtime.CompilerServices.RavenUnionCompanionAttribute")
+            ? Compilation.ResolveRuntimeType("Raven.Runtime.CompilerServices.RavenUnionCompanionAttribute")
+            : null;
         if (RavenUnionCompanionAttributeType is not null)
         {
             _ravenUnionCompanionCtor = RavenUnionCompanionAttributeType.GetConstructor([typeof(string)]);
@@ -1137,7 +1141,9 @@ internal class CodeGenerator
 
         const string metadataName =
             "Raven.Runtime.CompilerServices.RavenOptionNoneDefaultValueAttribute";
-        RavenOptionNoneDefaultValueAttributeType = Compilation.ResolveRuntimeType(metadataName);
+        RavenOptionNoneDefaultValueAttributeType = TargetRuntimeTypeExists(metadataName)
+            ? Compilation.ResolveRuntimeType(metadataName)
+            : null;
         if (RavenOptionNoneDefaultValueAttributeType is not null)
         {
             _ravenOptionNoneDefaultValueCtor =
