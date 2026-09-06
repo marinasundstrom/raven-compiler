@@ -68,6 +68,9 @@ The [Playground architecture](design/playground.md) document describes the
 browser editor, compiler worker, sample-link contract, security boundaries,
 and build and test workflow.
 
+The [macro source shapes inventory](compiler/development/macro-shapes.md)
+categorizes existing macro carriers and future syntax candidates.
+
 Do not link to these areas from published pages. When a proposal becomes part
 of the language, move its user-relevant behavior into the specification and
 learning material rather than publishing the proposal as the feature guide.
