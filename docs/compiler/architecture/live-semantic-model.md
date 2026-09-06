@@ -190,6 +190,14 @@ can safely use public APIs while their callback-scoped lease is active. The
 driver should avoid holding semantic access while it is only walking syntax,
 because syntax traversal itself is not semantic truth.
 
+Before source declarations are complete, semantic leases coordinate through a
+compilation-owned initialization gate. This establishes one lock order for
+cross-document declaration binding and attached or freestanding macro expansion.
+A request cannot hold one document's semantic gate while another declaration
+pass needs it. After declaration initialization, documents retain independent
+semantic gates. Async callers establish ambient initialization ownership alongside
+their semantic lease; background try-acquire paths remain non-blocking.
+
 ## Language Server Scheduling
 
 Foreground requests are:

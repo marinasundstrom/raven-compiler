@@ -63,7 +63,7 @@ public partial class Compilation
     private readonly object _declarationTableGate = new();
     private bool _sourceTypeDeclarationsDeclared;
     private bool _sourceDeclarationsDeclared;
-    private bool _sourceDeclarationsComplete;
+    private volatile bool _sourceDeclarationsComplete;
     private bool _isDeclaringSourceTypes;
     private int _sourceDeclarationThreadId;
     private readonly Dictionary<SyntaxTree, TopLevelProgramMembers> _topLevelProgramMembers = new();

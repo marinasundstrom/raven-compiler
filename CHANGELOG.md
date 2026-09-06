@@ -41,6 +41,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Concurrent editor requests no longer deadlock while declaration binding expands
+  macros in another document, restoring outlines, hovers, inlays, and diagnostics
+  in macro-backed projects.
+
 - Core generation defines its union metadata attributes even when the compiler
   host already has Raven.Core loaded, preserving case binding after a rebuild.
 

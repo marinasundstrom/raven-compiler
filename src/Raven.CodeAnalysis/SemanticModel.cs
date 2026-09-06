@@ -172,10 +172,19 @@ public partial class SemanticModel
             return new SemanticAccessLease(this, releaseDepth: false, releaseGate: false);
         }
 
-        await _semanticAccessGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var declarationAccess = await Compilation.EnterSourceDeclarationAccessAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _semanticAccessGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            declarationAccess?.Dispose();
+            throw;
+        }
         // AsyncLocal changes made here do not flow back into the awaiting caller.
         // The caller establishes ambient access in its own execution context.
-        return new SemanticAccessLease(this, releaseDepth: false, releaseGate: true);
+        return new SemanticAccessLease(this, releaseDepth: false, releaseGate: true, declarationAccess);
     }
 
     internal IDisposable EnterSemanticAccess(CancellationToken cancellationToken)
@@ -190,9 +199,18 @@ public partial class SemanticModel
             return new SemanticAccessLease(this, releaseDepth: true, releaseGate: false);
         }
 
-        _semanticAccessGate.Wait(cancellationToken);
+        var declarationAccess = Compilation.EnterSourceDeclarationAccess(cancellationToken);
+        try
+        {
+            _semanticAccessGate.Wait(cancellationToken);
+        }
+        catch
+        {
+            declarationAccess?.Dispose();
+            throw;
+        }
         _semanticAccessDepth.Value++;
-        return new SemanticAccessLease(this, releaseDepth: true, releaseGate: true);
+        return new SemanticAccessLease(this, releaseDepth: true, releaseGate: true, declarationAccess);
     }
 
     internal async ValueTask<IDisposable?> TryEnterSemanticAccessAsync(CancellationToken cancellationToken)
@@ -206,10 +224,21 @@ public partial class SemanticModel
             return new SemanticAccessLease(this, releaseDepth: false, releaseGate: false);
         }
 
-        if (!await _semanticAccessGate.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        var declarationAccess = await Compilation.EnterSourceDeclarationAccessAsync(cancellationToken, tryEnter: true).ConfigureAwait(false);
+        if (declarationAccess is null)
             return null;
-
-        return new SemanticAccessLease(this, releaseDepth: false, releaseGate: true);
+        try
+        {
+            if (await _semanticAccessGate.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+                return new SemanticAccessLease(this, releaseDepth: false, releaseGate: true, declarationAccess);
+        }
+        catch
+        {
+            declarationAccess.Dispose();
+            throw;
+        }
+        declarationAccess.Dispose();
+        return null;
     }
 
     internal IDisposable? TryEnterSemanticAccess(CancellationToken cancellationToken)
@@ -224,17 +253,31 @@ public partial class SemanticModel
             return new SemanticAccessLease(this, releaseDepth: true, releaseGate: false);
         }
 
-        if (!_semanticAccessGate.Wait(0, cancellationToken))
+        var declarationAccess = Compilation.EnterSourceDeclarationAccess(cancellationToken, tryEnter: true);
+        if (declarationAccess is null)
             return null;
-
-        _semanticAccessDepth.Value++;
-        return new SemanticAccessLease(this, releaseDepth: true, releaseGate: true);
+        try
+        {
+            if (_semanticAccessGate.Wait(0, cancellationToken))
+            {
+                _semanticAccessDepth.Value++;
+                return new SemanticAccessLease(this, releaseDepth: true, releaseGate: true, declarationAccess);
+            }
+        }
+        catch
+        {
+            declarationAccess.Dispose();
+            throw;
+        }
+        declarationAccess.Dispose();
+        return null;
     }
 
     internal IDisposable EnterAmbientSemanticAccess()
     {
         _semanticAccessDepth.Value++;
-        return new SemanticAccessLease(this, releaseDepth: true, releaseGate: false);
+        return new SemanticAccessLease(this, releaseDepth: true, releaseGate: false,
+            Compilation.EnterAmbientSourceDeclarationAccess());
     }
 
     private sealed class SemanticBindingState
@@ -277,12 +320,14 @@ public partial class SemanticModel
         private SemanticModel? _semanticModel;
         private readonly bool _releaseDepth;
         private readonly bool _releaseGate;
+        private readonly IDisposable? _declarationAccess;
 
-        public SemanticAccessLease(SemanticModel semanticModel, bool releaseDepth, bool releaseGate)
+        public SemanticAccessLease(SemanticModel semanticModel, bool releaseDepth, bool releaseGate, IDisposable? declarationAccess = null)
         {
             _semanticModel = semanticModel;
             _releaseDepth = releaseDepth;
             _releaseGate = releaseGate;
+            _declarationAccess = declarationAccess;
         }
 
         public void Dispose()
@@ -296,6 +341,7 @@ public partial class SemanticModel
 
             if (_releaseGate)
                 semanticModel._semanticAccessGate.Release();
+            _declarationAccess?.Dispose();
         }
     }
 

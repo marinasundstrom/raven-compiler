@@ -510,6 +510,8 @@ public partial class Compilation
 
     internal void EnsureSourceDeclarationsComplete()
     {
+        using var declarationAccess = EnterSourceDeclarationAccess(CancellationToken.None);
+
         EnsureSetup();
 
         if (_sourceDeclarationsComplete)
@@ -545,6 +547,9 @@ public partial class Compilation
                     model.EnsureCompilationUnitDeclarationBindersCreated();
 
                 _sourceDeclarationsComplete = true;
+                // Wake requests already queued during initialization without waiting
+                // for the initiating document's remaining semantic work to finish.
+                _activeSourceDeclarationAccessLease?.ReleaseGate();
             }
             finally
             {
@@ -557,6 +562,8 @@ public partial class Compilation
 
     internal void EnsureSourceDeclarationsDeclared()
     {
+        using var declarationAccess = EnterSourceDeclarationAccess(CancellationToken.None);
+
         EnsureSetup();
 
         if (_sourceDeclarationsDeclared)
@@ -605,6 +612,8 @@ public partial class Compilation
 
     internal void EnsureSourceTypeDeclarationsDeclared()
     {
+        using var declarationAccess = EnterSourceDeclarationAccess(CancellationToken.None);
+
         EnsureSetup();
 
         if (_sourceTypeDeclarationsDeclared || _sourceDeclarationsDeclared)
