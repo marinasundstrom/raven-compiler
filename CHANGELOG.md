@@ -41,6 +41,8 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Nested macro names inside declared Raven fragments now resolve their macro symbols for hover, including `markup!` inside `component!`.
+
 - Concurrent editor requests no longer deadlock while declaration binding expands
   macros in another document, restoring outlines, hovers, inlays, and diagnostics
   in macro-backed projects.

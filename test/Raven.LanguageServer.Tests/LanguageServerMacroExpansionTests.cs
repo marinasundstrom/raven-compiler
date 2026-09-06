@@ -21,6 +21,35 @@ using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 public sealed class LanguageServerMacroExpansionTests
 {
+    [Theory]
+    [InlineData("answer!()", "answer")]
+    [InlineData("raven! { 42 }", "raven")]
+    public async Task HoverHandler_NestedMacroName_ResolvesInsideDeclarationFragment(string invocation, string name)
+    {
+        var code = "import Raven.LanguageServer.Tests.*\ncomponent! Greeting(Name: string) {\n    let value = " + invocation + "\n}";
+        var path = Path.Combine(Path.GetTempPath(), $"raven-nested-macro-{Guid.NewGuid():N}.rvn");
+        var workspace = RavenWorkspace.Create(targetFramework: "net10.0");
+        var manager = new WorkspaceManager(workspace, NullLogger<WorkspaceManager>.Instance);
+        manager.Initialize(new InitializeParams());
+        var store = new DocumentStore(manager, NullLogger<DocumentStore>.Instance);
+        var uri = DocumentUri.FromFileSystemPath(path);
+        var document = await store.UpsertDocumentAsync(uri, code);
+        workspace.TryApplyChanges(workspace.CurrentSolution.AddMacroReference(document.Project.Id,
+            new MacroReference(new DeclarationFragmentMacro()))
+            .AddMacroReference(document.Project.Id, new MacroReference(new AnswerMacro()))
+            .AddMacroReference(document.Project.Id, new MacroReference(new RavenBodyMacro()))).ShouldBeTrue();
+        var offset = code.IndexOf(invocation, StringComparison.Ordinal) + 1;
+        var hover = await new HoverHandler(store, NullLogger<HoverHandler>.Instance).Handle(new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier(uri),
+            Position = PositionHelper.ToRange(SourceText.From(code), new TextSpan(offset, 0)).Start
+        }, CancellationToken.None);
+        hover.ShouldNotBeNull();
+        hover.Contents.MarkupContent!.Value.ShouldContain(name);
+        hover.Contents.MarkupContent!.Value.ShouldContain("Macro");
+        hover.Range!.Start.Line.ShouldBe(2);
+    }
+
     [Fact]
     public async Task HoverHandler_ArgumentListMacro_ResolvesNameArgumentsAndCallback()
     {

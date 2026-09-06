@@ -299,3 +299,5 @@ Important validation scenarios:
 Use headless language-server scenarios for editor workflows and focused compiler
 tests for binder/semantic-model behavior. Runtime/sample validation remains the
 authority for emitted program behavior.
+
+Macro fragment semantic queries resolve nested macro names in the authored invocation's scope, including its imports. They return the macro symbol and authored token span independently of symbols produced by the nested expansion, so hover can describe a nested macro as well as expressions inside its body.

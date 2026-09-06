@@ -431,6 +431,12 @@ public sealed class MacroFragmentSemanticInfoTests
         var customerPosition = code.LastIndexOf("customer.Name", StringComparison.Ordinal) + 1;
         var namePosition = code.LastIndexOf("Name", StringComparison.Ordinal) + 1;
 
+        var macroPosition = code.LastIndexOf("fragmentHover!", StringComparison.Ordinal) + 1;
+        var macroInfo = compilation.GetMacroFragmentSemanticInfo(expression, macroPosition);
+        var macro = Assert.IsAssignableFrom<IMacroSymbol>(macroInfo?.SymbolInfo.Symbol);
+        Assert.Equal("fragmentHover", macro.Name);
+        Assert.True(macroInfo!.Span.Contains(macroPosition));
+
         var customerInfo = compilation.GetMacroFragmentSemanticInfo(expression, customerPosition);
         var nameInfo = compilation.GetMacroFragmentSemanticInfo(expression, namePosition);
 

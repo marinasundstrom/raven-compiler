@@ -373,6 +373,36 @@ public partial class SemanticModel
         if (token.Kind == SyntaxKind.None || token.Parent is null)
             return null;
 
+        // The fragment bind records the expansion's symbols, not the macro
+        // name itself. Resolve that name in the authored invocation's scope;
+        // the speculative fragment has no imports or enclosing declarations.
+        var namedMacro = token.Parent.AncestorsAndSelf()
+            .OfType<FreestandingMacroExpressionSyntax>()
+            .FirstOrDefault(invocation => invocation.Name.Span.Contains(token.Span));
+        if (namedMacro is not null && namedMacro.TryGetMacroName(out var macroName))
+        {
+            IMacroSymbol? macroSymbol = null;
+            if (Compilation.TryResolveLocalMacroDeclarationSymbol(
+                    resolutionContext, macroName, namedMacro.Name.GetMacroArity(),
+                    out var localMacro, out _))
+            {
+                macroSymbol = ConstructLocalMacroSymbol(namedMacro.Name, localMacro);
+            }
+            else if (Compilation.GetMacroRegistry().TryResolveMacroSymbol(
+                    Compilation, resolutionContext, macroName, out var loadedMacro, out _))
+            {
+                macroSymbol = loadedMacro;
+            }
+
+            if (macroSymbol is not null)
+            {
+                return new MacroFragmentSemanticInfo(
+                    region, token.Span, new SymbolInfo(macroSymbol),
+                    new TypeInfo(macroSymbol.ExpressionResultType, macroSymbol.ExpressionResultType),
+                    token.Parent);
+            }
+        }
+
         if (nestingDepth < MaxMacroFragmentNestingDepth)
         {
             foreach (var nestedInvocation in token.Parent.AncestorsAndSelf().OfType<FreestandingMacroExpressionSyntax>())
