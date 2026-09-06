@@ -185,6 +185,6 @@ a docs-only update after a Raven release remains documentation for that release
 instead of being presented as the next unreleased preview. The workflow's
 optional `documented_version` input can select another version, and
 `RAVEN_SITE_VERSION` provides the same override for local builds. Local
-commit-qualified SDK versions such as `0.1.9-preview.1-local.<sha>` are displayed
-as `0.1.9-preview.1`. A local artifact also says `uncommitted changes` when
+commit-qualified SDK versions such as `0.1.10-preview.1-local.<sha>` are displayed
+as `0.1.10-preview.1`. A local artifact also says `uncommitted changes` when
 tracked files differ from its source commit.

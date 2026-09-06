@@ -6,7 +6,7 @@ on:
       version:
         description: Version to package without a leading v
         required: true
-        default: 0.1.9
+        default: 0.1.10
       publish_github_release:
         description: Publish the artifacts to the matching v<version> GitHub release
         required: true
