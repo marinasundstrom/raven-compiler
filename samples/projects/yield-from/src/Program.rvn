@@ -1,0 +1,80 @@
+import System.*
+import System.Collections.Generic.*
+import System.Runtime.CompilerServices.*
+import System.Threading.*
+import System.Threading.Tasks.*
+
+class Sample {
+    static func SecondGenerator() -> IEnumerable<int> {
+        try {
+            yield 1
+            yield 2
+            yield 3
+        } finally {
+            Console.WriteLine("sync source disposed")
+        }
+    }
+
+    static func FirstGenerator() -> IEnumerable<int> {
+        yield 42
+        yield from SecondGenerator()
+    }
+
+    static async func AsyncSecondGenerator([EnumeratorCancellation] token: CancellationToken) -> IAsyncEnumerable<int> {
+        try {
+            for value in 1..3 {
+                await Task.Delay(1, token)
+                yield value
+            }
+        } finally {
+            await Task.Delay(1)
+            Console.WriteLine("async source disposed")
+        }
+    }
+
+    static async func AsyncFirstGenerator([EnumeratorCancellation] token: CancellationToken) -> IAsyncEnumerable<int> {
+        yield 42
+        let completed = (yield from AsyncSecondGenerator(token))
+        Console.WriteLine("delegation completed: ${completed}")
+    }
+
+    static async func Run() -> Task {
+        Console.WriteLine("Synchronous delegation")
+        for value in FirstGenerator() {
+            Console.WriteLine(value)
+        }
+
+        Console.WriteLine("Asynchronous delegation")
+        await for value in AsyncFirstGenerator(CancellationToken.None) {
+            Console.WriteLine(value)
+        }
+
+        Console.WriteLine("Early disposal")
+        await for value in AsyncFirstGenerator(CancellationToken.None) {
+            Console.WriteLine(value)
+            if value == 1 {
+                break
+            }
+        }
+
+        Console.WriteLine("Consumer cancellation")
+        use cancellation = CancellationTokenSource()
+        let iterator = AsyncFirstGenerator(CancellationToken.None).GetAsyncEnumerator(cancellation.Token)
+        try {
+            while await iterator.MoveNextAsync() {
+                Console.WriteLine(iterator.Current)
+                if iterator.Current == 1 {
+                    cancellation.Cancel()
+                }
+            }
+        } catch (OperationCanceledException _) {
+            Console.WriteLine("cancelled")
+        } finally {
+            await iterator.DisposeAsync()
+        }
+    }
+}
+
+func Main() {
+    Sample.Run().GetAwaiter().GetResult()
+}

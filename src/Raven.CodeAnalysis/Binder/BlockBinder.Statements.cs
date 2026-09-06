@@ -1314,7 +1314,7 @@ partial class BlockBinder
 
     private IMethodSymbol? TryResolveAsyncDisposeMethod(INamedTypeSymbol enumeratorType)
     {
-        foreach (var method in enumeratorType.GetMembers("DisposeAsync").OfType<IMethodSymbol>())
+        foreach (var method in new[] { enumeratorType }.Concat(enumeratorType.AllInterfaces).SelectMany(type => type.GetMembers("DisposeAsync")).OfType<IMethodSymbol>())
         {
             if (method.IsStatic || method.Parameters.Length != 0)
                 continue;
@@ -2326,10 +2326,10 @@ partial class BlockBinder
         if (yieldStatement.Expression is ReturnExpressionSyntax { Expression: { } recoveredExpression })
             return BindYieldValueExpression(recoveredExpression);
 
-        return BindYieldValueExpression(yieldStatement.Expression);
+        return BindYieldValueExpression(yieldStatement.Expression, yieldStatement.FromKeyword.Kind != SyntaxKind.None);
     }
 
-    private BoundStatement BindYieldValueExpression(ExpressionSyntax expressionSyntax)
+    private BoundStatement BindYieldValueExpression(ExpressionSyntax expressionSyntax, bool isDelegating = false)
     {
         if (_expressionContextDepth > 0)
         {
@@ -2343,9 +2343,11 @@ partial class BlockBinder
         if (elementType.TypeKind == TypeKind.Error)
             elementType = Compilation.ErrorTypeSymbol;
 
-        expression = BindYieldValueConversion(expression, elementType, expressionSyntax);
+        var iteration = isDelegating ? BindYieldFromIteration(expression, expressionSyntax, kind, elementType) : null;
+        if (!isDelegating)
+            expression = BindYieldValueConversion(expression, elementType, expressionSyntax);
 
-        return new BoundYieldStatement(expression, elementType, kind);
+        return new BoundYieldStatement(expression, elementType, kind, iteration);
     }
 
     private BoundStatement BindThrowStatement(ThrowStatementSyntax throwStatement)

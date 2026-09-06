@@ -380,7 +380,7 @@ internal class StatementSyntaxParser : SyntaxParser
 
             var breakKeyword = ReadToken();
             var terminatorToken = ConsumeTerminator();
-            return YieldStatement(yieldKeyword, BreakExpression(breakKeyword, Token(SyntaxKind.None)), terminatorToken);
+            return YieldStatement(yieldKeyword, Token(SyntaxKind.None), BreakExpression(breakKeyword, Token(SyntaxKind.None)), terminatorToken);
         }
 
         if (next.Kind == SyntaxKind.ReturnKeyword)
@@ -417,12 +417,16 @@ internal class StatementSyntaxParser : SyntaxParser
             terminatorToken = Token(SyntaxKind.None);
         }
 
-        return YieldStatement(yieldKeyword, ReturnExpression(returnKeyword, expression), terminatorToken);
+        return YieldStatement(yieldKeyword, Token(SyntaxKind.None), ReturnExpression(returnKeyword, expression), terminatorToken);
     }
 
     private YieldStatementSyntax ParseYieldStatementSyntax(SyntaxToken yieldKeyword)
     {
         SetTreatNewlinesAsTokens(false);
+
+        var fromKeyword = PeekToken() is { Kind: SyntaxKind.IdentifierToken, Text: "from" }
+            ? ReadToken()
+            : Token(SyntaxKind.None);
 
         var expression = new ExpressionSyntaxParser(this).ParseExpression();
 
@@ -441,7 +445,7 @@ internal class StatementSyntaxParser : SyntaxParser
             terminatorToken = Token(SyntaxKind.None);
         }
 
-        return YieldStatement(yieldKeyword, expression, terminatorToken);
+        return YieldStatement(yieldKeyword, fromKeyword, expression, terminatorToken);
     }
 
     private StatementSyntax ParseIfStatementSyntax()

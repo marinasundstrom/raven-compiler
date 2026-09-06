@@ -420,6 +420,7 @@ internal sealed class SynthesizedIteratorTypeSymbol : SourceNamedTypeSymbol
             s_emptyLocations,
             s_emptySyntax,
             isStatic: false,
+            isAsync: true,
             methodKind: MethodKind.ExplicitInterfaceImplementation,
             declaredAccessibility: Accessibility.Private);
 

@@ -715,7 +715,6 @@ PrimaryExpression        ::= Literal
                            | BreakExpression
                            | ContinueExpression
                            | YieldExpression
-                           | YieldBreakExpression
                            | MacroContributionExpression
                            | Block
                            | IfExpression
@@ -745,8 +744,7 @@ ReturnExpression         ::= 'return' Expression ;
 ThrowExpression          ::= 'throw' Expression ;
 BreakExpression          ::= 'break' [Identifier] ;
 ContinueExpression       ::= 'continue' [Identifier] ;
-YieldExpression          ::= 'yield' ['return'] Expression ;
-YieldBreakExpression     ::= 'yield' 'break' ;
+YieldExpression          ::= 'yield' ['from'] Expression ;
 MacroContributionExpression
                          ::= ('expand' | 'replace' | 'introduce') Expression ;
 (* Macro contribution expressions are contextual to macro declarations. *)

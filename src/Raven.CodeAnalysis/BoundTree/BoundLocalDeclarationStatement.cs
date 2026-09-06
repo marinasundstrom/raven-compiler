@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Raven.CodeAnalysis;
 
 sealed partial class BoundLocalDeclarationStatement : BoundStatement
@@ -7,7 +9,7 @@ sealed partial class BoundLocalDeclarationStatement : BoundStatement
 
     public BoundLocalDeclarationStatement(IEnumerable<BoundVariableDeclarator> declarators, bool isUsing = false)
     {
-        Declarators = declarators;
+        Declarators = declarators.ToImmutableArray();
         IsUsing = isUsing;
     }
 

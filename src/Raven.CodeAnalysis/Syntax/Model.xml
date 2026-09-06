@@ -581,6 +581,7 @@
   </Node>
   <Node Name="YieldStatement" Inherits="Statement">
     <Slot Name="YieldKeyword" Type="Token" DefaultToken="YieldKeyword" />
+    <Slot Name="FromKeyword" Type="Token" IsOptionalToken="true" DefaultToken="None" />
     <Slot Name="Expression" Type="Expression" />
     <Slot Name="TerminatorToken" Type="Token" IsOptionalToken="true" DefaultToken="None" />
   </Node>
@@ -720,6 +721,7 @@
   </Node>
   <Node Name="YieldExpression" Inherits="Expression">
     <Slot Name="YieldKeyword" Type="Token" DefaultToken="YieldKeyword" />
+    <Slot Name="FromKeyword" Type="Token" IsOptionalToken="true" DefaultToken="None" />
     <Slot Name="Expression" Type="Expression" />
   </Node>
   <Node Name="PropagateExpression" Inherits="Expression">

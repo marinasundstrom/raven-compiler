@@ -26,6 +26,11 @@ public static class SemanticClassifier
             {
                 tokenMap[descendant] = SemanticClassification.Keyword;
             }
+            else if (descendant.Parent is YieldStatementSyntax yieldStatement && descendant == yieldStatement.FromKeyword ||
+                     descendant.Parent is YieldExpressionSyntax yieldExpression && descendant == yieldExpression.FromKeyword)
+            {
+                tokenMap[descendant] = SemanticClassification.Keyword;
+            }
             // Reserved words
             else if (descendant.IsKeyword())
             {

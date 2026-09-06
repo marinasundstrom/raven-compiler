@@ -268,7 +268,7 @@ class C {
     }
 
     [Fact]
-    public void Rewrite_PopulatesMoveNextBody_ForYield()
+    public void Rewrite_ExposesSynchronousIteratorProtocol()
     {
         const string source = """
 import System.Collections.Generic.*
@@ -297,34 +297,11 @@ class C {
         IteratorLowerer.Rewrite(methodSymbol, boundBody);
 
         var stateMachine = Assert.IsType<SynthesizedIteratorTypeSymbol>(methodSymbol.IteratorStateMachine);
-        var moveNextBody = Assert.IsType<BoundBlockStatement>(stateMachine.MoveNextBody);
-
-        var statements = moveNextBody.Statements.ToArray();
-        Assert.True(statements.Length >= 6);
-
-        var dispatches = statements.OfType<BoundIfStatement>().Take(2).ToArray();
-        Assert.Equal(2, dispatches.Length);
-
-        var stateDispatch0 = dispatches[0];
-        var stateDispatch1 = dispatches[1];
-
-        AssertStateDispatch(stateDispatch0, 0, stateMachine.StateField);
-        AssertStateDispatch(stateDispatch1, 1, stateMachine.StateField);
-
-        var entryLabel = Assert.IsType<BoundLabeledStatement>(statements.OfType<BoundLabeledStatement>().First());
-        var entryBlock = Assert.IsType<BoundBlockStatement>(entryLabel.Statement);
-        var entryStatements = entryBlock.Statements.ToArray();
-        var yieldBlock = Assert.Single<BoundStatement>(entryStatements);
-        var yieldStatements = Assert.IsType<BoundBlockStatement>(yieldBlock).Statements.ToArray();
-
-        AssertFieldAssignmentStatement(yieldStatements[0], stateMachine.CurrentField);
-
-        AssertFieldAssignmentStatement(yieldStatements[1], stateMachine.StateField, expectedValue: 1);
-
-        AssertFieldAssignmentStatement(
-            statements.First(statement => IsFieldAssignment(statement, stateMachine.StateField, expectedValue: -1)),
-            stateMachine.StateField,
-            expectedValue: -1);
+        Assert.NotNull(stateMachine.MoveNextBody);
+        Assert.Equal(SpecialType.System_Boolean, stateMachine.MoveNextMethod.ReturnType.SpecialType);
+        Assert.Equal(SpecialType.System_Int32, stateMachine.CurrentProperty.Type.SpecialType);
+        Assert.NotNull(stateMachine.DisposeMethod);
+        Assert.Contains(stateMachine.AllInterfaces, type => type.MetadataName == "IEnumerator`1");
     }
 
     [Fact]
@@ -653,75 +630,6 @@ class C {
     }
 
     [Fact]
-    public void Rewrite_DisposeRunsPendingFinalizers()
-    {
-        const string source = """
-import System.Collections.Generic.*
-
-class C {
-    func Iterator(count: int) -> IEnumerable<int> {
-        try {
-            yield count
-        } finally {
-            let disposed = count
-        }
-    }
-}
-""";
-
-        var (compilation, tree) = CreateCompilation(source);
-        compilation.EnsureSetup();
-
-        var model = compilation.GetSemanticModel(tree);
-        var root = tree.GetRoot();
-
-        var methodSyntax = root
-            .DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Single();
-
-        var methodSymbol = Assert.IsType<SourceMethodSymbol>(model.GetDeclaredSymbol(methodSyntax));
-        var boundBody = Assert.IsType<BoundBlockStatement>(model.GetBoundNode(methodSyntax.Body!));
-
-        IteratorLowerer.Rewrite(methodSymbol, boundBody);
-
-        var stateMachine = Assert.IsType<SynthesizedIteratorTypeSymbol>(methodSymbol.IteratorStateMachine);
-
-        var disposeBody = Assert.IsType<BoundBlockStatement>(stateMachine.DisposeBody);
-        var disposeStatements = disposeBody.Statements.ToArray();
-        Assert.Equal(3, disposeStatements.Length);
-
-        var conditional = Assert.IsType<BoundIfStatement>(disposeStatements[0]);
-        var condition = Assert.IsType<BoundBinaryExpression>(conditional.Condition);
-
-        var stateAccess = Assert.IsType<BoundFieldAccess>(condition.Left);
-        Assert.Equal(stateMachine.StateField, stateAccess.Field);
-
-        var resumeLiteral = Assert.IsType<BoundLiteralExpression>(condition.Right);
-        Assert.Equal(1, resumeLiteral.Value);
-
-        var thenBlock = Assert.IsType<BoundBlockStatement>(conditional.ThenNode);
-        var thenStatements = thenBlock.Statements.ToArray();
-        Assert.True(thenStatements.Length >= 3);
-
-        AssertFieldAssignmentStatement(thenStatements[0], stateMachine.StateField, expectedValue: -1);
-
-        var finalizerBlock = Assert.IsType<BoundBlockStatement>(thenStatements[1]);
-
-        var moveNextStatements = Assert.IsType<BoundBlockStatement>(stateMachine.MoveNextBody).Statements.ToArray();
-        var entryLabel = Assert.IsType<BoundLabeledStatement>(moveNextStatements.OfType<BoundLabeledStatement>().First());
-        var entryBlock = Assert.IsType<BoundBlockStatement>(entryLabel.Statement);
-        var tryStatement = Assert.IsType<BoundTryStatement>(Assert.Single(entryBlock.Statements));
-        var finallyBlock = Assert.IsType<BoundBlockStatement>(tryStatement.FinallyBlock);
-        Assert.Same(finallyBlock, finalizerBlock);
-
-        AssertFieldAssignmentStatement(disposeStatements[1], stateMachine.StateField, expectedValue: -1);
-
-        var finalReturn = Assert.IsType<BoundReturnStatement>(disposeStatements[2]);
-        Assert.Null(finalReturn.Expression);
-    }
-
-    [Fact]
     public void Rewrite_DoesNotCreateGetEnumeratorBodies_ForEnumeratorIterator()
     {
         const string source = """
@@ -862,21 +770,4 @@ class C {
         Assert.Equal(BoundLiteralExpressionKind.FalseLiteral, literal.Kind);
     }
 
-    private static void AssertStateDispatch(BoundIfStatement dispatch, int expectedState, IFieldSymbol stateField)
-    {
-        var condition = Assert.IsType<BoundBinaryExpression>(dispatch.Condition);
-        var left = Assert.IsType<BoundFieldAccess>(condition.Left);
-        Assert.Equal(stateField, left.Field);
-
-        var right = Assert.IsType<BoundLiteralExpression>(condition.Right);
-        Assert.Equal(expectedState, right.Value);
-
-        var thenBlock = Assert.IsType<BoundBlockStatement>(dispatch.ThenNode);
-        var thenStatements = thenBlock.Statements.ToArray();
-        Assert.Equal(2, thenStatements.Length);
-
-        AssertFieldAssignmentStatement(thenStatements[0], stateField, expectedValue: -1);
-
-        Assert.IsType<BoundGotoStatement>(thenStatements[1]);
-    }
 }

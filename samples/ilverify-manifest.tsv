@@ -5,3 +5,4 @@ standalone	net10.0	samples/cases/quote-summary-linq-result-option.rav	quote-summ
 standalone	net10.0	samples/cases/order-handler-interface-async.rav	order-handler-interface-async	async state machine, generic interface dispatch, and pattern receivers
 project	net10.0	samples/projects/data-literal-macros/DataLiteralMacros.rvnproj	DataLiteralMacros	standard macros and framework literal APIs
 project	net10.0	samples/projects/syntax-tree-api/SyntaxTreeApiSample.rvnproj	SyntaxTreeApiSample	Raven.CodeAnalysis and .NET metadata interop
+project	net10.0	samples/projects/yield-from/YieldFrom.rvnproj	YieldFrom	iterator delegation, async cancellation, and suspended enumerator disposal

@@ -144,7 +144,7 @@ class MethodBodyBinder : BlockBinder
         ReportUnassignedOutParametersIfNeeded(bodySyntax, bound);
 
         var unit = Compilation.UnitTypeSymbol;
-        var skipTrailingExpressionCheck = ShouldSkipTrailingExpressionCheck(unit);
+        var skipTrailingExpressionCheck = _methodSymbol.IsIterator || ShouldSkipTrailingExpressionCheck(unit);
 
         if (!skipTrailingExpressionCheck &&
             !SymbolEqualityComparer.Default.Equals(GetTrailingExpressionTargetType(_methodSymbol), unit))

@@ -26,7 +26,8 @@ internal sealed record ForIterationInfo(
     BoundExpression? RangeStart = null,
     BoundExpression? RangeEnd = null,
     BoundExpression? RangeStep = null,
-    bool RangeUpperExclusive = false)
+    bool RangeUpperExclusive = false,
+    BoundExpression? CancellationToken = null)
 {
     public static ForIterationInfo ForArray(IArrayTypeSymbol arrayType) =>
         new(ForIterationKind.Array, arrayType.ElementType, arrayType);

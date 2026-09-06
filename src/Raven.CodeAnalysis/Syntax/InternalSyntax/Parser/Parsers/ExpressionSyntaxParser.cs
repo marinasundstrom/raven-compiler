@@ -879,7 +879,7 @@ internal partial class ExpressionSyntaxParser : SyntaxParser
             AddDiagnostic(DiagnosticInfo.Create(
                 CompilerDiagnostics.YieldBreakFormRemoved,
                 GetSpanOfLastToken()));
-            return YieldExpression(yieldKeyword, BreakExpression(breakKeyword, Token(SyntaxKind.None)));
+            return YieldExpression(yieldKeyword, Token(SyntaxKind.None), BreakExpression(breakKeyword, Token(SyntaxKind.None)));
         }
 
         SyntaxToken? returnKeyword = null;
@@ -891,11 +891,15 @@ internal partial class ExpressionSyntaxParser : SyntaxParser
                 GetSpanOfLastToken()));
         }
 
+        var fromKeyword = PeekToken() is { Kind: SyntaxKind.IdentifierToken, Text: "from" }
+            ? ReadToken()
+            : Token(SyntaxKind.None);
+
         var expression = new ExpressionSyntaxParser(this, allowMatchExpressionSuffixes: false).ParseExpression();
         if (returnKeyword is not null)
             expression = ReturnExpression(returnKeyword, expression);
 
-        return YieldExpression(yieldKeyword, expression);
+        return YieldExpression(yieldKeyword, fromKeyword, expression);
     }
 
     private bool TryParseLambdaExpression(out FunctionExpressionSyntax? lambda)

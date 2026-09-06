@@ -44,7 +44,7 @@ partial class BlockBinder
         {
             HasYield = true;
 
-            if (node.Expression.Type is ITypeSymbol { TypeKind: not TypeKind.Error } type)
+            if ((node.Iteration?.ElementType ?? node.Expression.Type) is ITypeSymbol { TypeKind: not TypeKind.Error } type)
                 _yieldTypes.Add(TypeSymbolNormalization.NormalizeForInference(type));
 
             base.VisitYieldStatement(node);
@@ -54,7 +54,7 @@ partial class BlockBinder
         {
             HasYield = true;
 
-            if (node.Expression.Type is ITypeSymbol { TypeKind: not TypeKind.Error } type)
+            if ((node.Iteration?.ElementType ?? node.Expression.Type) is ITypeSymbol { TypeKind: not TypeKind.Error } type)
                 _yieldTypes.Add(TypeSymbolNormalization.NormalizeForInference(type));
 
             base.VisitYieldExpression(node);

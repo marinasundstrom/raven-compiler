@@ -4678,9 +4678,12 @@ partial class BlockBinder : Binder
         if (elementType.TypeKind == TypeKind.Error)
             elementType = Compilation.ErrorTypeSymbol;
 
-        expression = BindYieldValueConversion(expression, elementType, expressionSyntax);
+        var isDelegating = yieldExpression.FromKeyword.Kind != SyntaxKind.None;
+        var iteration = isDelegating ? BindYieldFromIteration(expression, expressionSyntax, kind, elementType) : null;
+        if (!isDelegating)
+            expression = BindYieldValueConversion(expression, elementType, expressionSyntax);
 
-        return new BoundYieldExpression(expression, elementType, kind, Compilation.UnitTypeSymbol);
+        return new BoundYieldExpression(expression, elementType, kind, Compilation.UnitTypeSymbol, iteration);
     }
 
     private BoundExpression BindYieldValueConversion(

@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 ### Added
 
+- `yield from source` delegates synchronous or asynchronous sequences in statement
+  and expression positions, with element conversions and async cancellation-token
+  forwarding. Delegation expressions evaluate to `unit` after completion.
+
 - Added Roslyn-shaped Fix All support with document, project, and solution
   scopes, stable code-action equivalence keys, and a reusable batch provider
   that merges non-overlapping text changes.
@@ -28,6 +32,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-08-29**.
 
 - Constant hovers show `const` declarations and identify them as constants,
   including namespace-level `extern const` values.
+
+- Async enumeration awaits enumerator disposal on completion, exceptions, and
+  early iterator disposal, following C# iterator cleanup semantics.
 
 - Opening a source file in a nested project omitted from the workspace solution
   now loads its containing project on demand, restoring sibling type lookup

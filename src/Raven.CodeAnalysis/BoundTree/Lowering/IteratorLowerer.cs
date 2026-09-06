@@ -114,6 +114,8 @@ internal static class IteratorLowerer
         SynthesizedIteratorTypeSymbol stateMachine,
         BoundBlockStatement body)
     {
+        body = YieldFromLowerer.Rewrite(stateMachine.IteratorMethod, compilation, body);
+        body = AwaitForLowerer.Rewrite(stateMachine.IteratorMethod, body);
         var targetMethod = stateMachine.AsyncMoveNextMethod ?? stateMachine.MoveNextMethod;
         var builder = new MoveNextBuilder(compilation, stateMachine, targetMethod);
         var moveNext = builder.Rewrite(body);
@@ -223,9 +225,13 @@ internal static class IteratorLowerer
             stateMachine.Compilation.GetSpecialType(SpecialType.System_Unit));
         statements.Add(new BoundAssignmentStatement(assignment));
 
-        var returnValue = new BoundDefaultValueExpression(stateMachine.AsyncDisposeMethod!.ReturnType);
-        statements.Add(new BoundReturnStatement(returnValue));
-        return new BoundBlockStatement(statements);
+        var cleanup = new BoundBlockStatement(statements);
+        var pendingCleanup = stateMachine.DisposeBody ?? new BoundBlockStatement([]);
+        var body = new BoundBlockStatement([
+            new BoundTryStatement(pendingCleanup, [], cleanup),
+            new BoundReturnStatement(null),
+        ]);
+        return AsyncLowerer.Rewrite(stateMachine.AsyncDisposeMethod!, body);
     }
 
     private static BoundBlockStatement CreateResetBody(
@@ -807,6 +813,7 @@ internal static class IteratorLowerer
         private readonly SynthesizedIteratorTypeSymbol _stateMachine;
         private readonly SourceMethodSymbol _moveNextMethod;
         private readonly List<StateEntry> _states = new();
+        private readonly Dictionary<int, ILabelSymbol> _protectedStateTargets = new();
         private readonly Dictionary<ILocalSymbol, SourceFieldSymbol> _hoistedLocals = new(SymbolEqualityComparer.Default);
         private readonly HashSet<string> _hoistedFieldNames = new(StringComparer.Ordinal);
         private readonly Stack<FinallyFrame> _finallyStack = new();
@@ -843,7 +850,7 @@ internal static class IteratorLowerer
 
             HoistLocals(block);
             _startState = AllocateState();
-            _returnLabel = CreateLabel("<>Return");
+            _returnLabel = new AsyncProtectedRegionExitLabelSymbol("<>Return", _moveNextMethod, _stateMachine, _stateMachine.ContainingNamespace, [Location.None], []);
             _resultLocal = CreateResultLocal();
 
             var rewrittenBody = (BoundBlockStatement)VisitBlockStatement(block);
@@ -882,6 +889,14 @@ internal static class IteratorLowerer
             foreach (var declarator in node.Declarators)
             {
                 var initializer = VisitExpression(declarator.Initializer) ?? declarator.Initializer;
+                if (initializer?.Type?.SpecialType == SpecialType.System_Unit &&
+                    BoundNodeFacts.ContainsControlTransfer(initializer))
+                {
+                    // Complete suspension before loading the assignment receiver. Keep
+                    // the expression's scope and cleanup intact while discarding its unit value.
+                    hoistedStatements.Add(new BoundExpressionStatement(initializer));
+                    initializer = new BoundUnitExpression(_unitType);
+                }
 
                 if (_hoistedLocals.TryGetValue(declarator.Local, out var field))
                 {
@@ -1015,7 +1030,7 @@ internal static class IteratorLowerer
 
             if (wasTopLevel)
             {
-                var inner = new BoundBlockStatement(statements, node.LocalsToDispose);
+                var inner = new BoundBlockStatement(new[] { CreateStateAssignment(-1) }.Cast<BoundStatement>().Concat(statements), node.LocalsToDispose);
                 var labeled = new BoundLabeledStatement(_startState.Label, inner);
                 return new BoundBlockStatement(new BoundStatement[] { labeled });
             }
@@ -1028,6 +1043,7 @@ internal static class IteratorLowerer
             if (node is null)
                 return null;
 
+            var firstState = _states.Count;
             FinallyFrame? frame = null;
             if (node.FinallyBlock is not null)
             {
@@ -1056,7 +1072,7 @@ internal static class IteratorLowerer
                         frame.FinallyBlock = finallyBlock;
                 }
 
-                return new BoundTryStatement(tryBlock, catchBuilder.ToImmutable(), finallyBlock);
+                return ProtectIteratorRegion(new BoundTryStatement(tryBlock, catchBuilder.ToImmutable(), finallyBlock), firstState);
             }
             finally
             {
@@ -1084,7 +1100,7 @@ internal static class IteratorLowerer
             var assignState = CreateStateAssignment(resumeState.Value);
 
             var returnTrue = CreateReturnStatement(CreateBoolLiteral(true));
-            var resumeLabel = new BoundLabeledStatement(resumeState.Label, new BoundBlockStatement(Array.Empty<BoundStatement>()));
+            var resumeLabel = new BoundLabeledStatement(resumeState.Label, new BoundBlockStatement([CreateStateAssignment(-1)]));
 
             if (_finallyStack.Count > 0)
             {
@@ -1366,14 +1382,19 @@ internal static class IteratorLowerer
                     CreateStateAssignment(-1),
                 };
 
+                BoundBlockStatement? cleanup = null;
                 foreach (var frame in entry.Value)
                 {
                     if (frame.FinallyBlock is null)
                         continue;
 
-                    thenStatements.Add(frame.FinallyBlock);
-                    thenStatements.Add(CreateStateAssignment(-1));
+                    // Outer finally blocks must still execute when inner cleanup throws.
+                    cleanup = cleanup is null
+                        ? frame.FinallyBlock
+                        : new BoundBlockStatement([new BoundTryStatement(cleanup, [], frame.FinallyBlock)]);
                 }
+                if (cleanup is not null)
+                    thenStatements.Add(cleanup);
 
                 thenStatements.Add(new BoundReturnStatement(null));
 
@@ -1415,12 +1436,31 @@ internal static class IteratorLowerer
                 var condition = CreateStateEquals(state.Value);
                 var thenBlock = new BoundBlockStatement(new BoundStatement[]
                 {
-                    CreateStateAssignment(-1),
-                    new BoundGotoStatement(state.Label),
+                    new BoundGotoStatement(_protectedStateTargets.GetValueOrDefault(state.Value, state.Label)),
                 });
 
                 yield return new BoundIfStatement(condition, thenBlock);
             }
+        }
+
+        private BoundStatement ProtectIteratorRegion(BoundTryStatement region, int firstState)
+        {
+            if (firstState == _states.Count)
+                return region;
+
+            // CLR branches cannot enter a protected region. Resume through its entry,
+            // then dispatch from inside the try, preserving nested region boundaries.
+            var entry = CreateLabel("iterator_try_entry");
+            var dispatch = new List<BoundStatement>();
+            foreach (var state in _states.Skip(firstState))
+            {
+                var target = _protectedStateTargets.GetValueOrDefault(state.Value, state.Label);
+                dispatch.Add(new BoundConditionalGotoStatement(target, CreateStateEquals(state.Value), jumpIfTrue: true));
+                _protectedStateTargets[state.Value] = entry;
+            }
+            dispatch.AddRange(region.TryBlock.Statements);
+            var rewritten = new BoundTryStatement(new BoundBlockStatement(dispatch, region.TryBlock.LocalsToDispose), region.CatchClauses, region.FinallyBlock, region.Kind);
+            return new BoundBlockStatement([new BoundLabeledStatement(entry, new BoundBlockStatement([])), rewritten]);
         }
 
         private BoundExpression CreateStateEquals(int value)
@@ -1677,7 +1717,26 @@ internal static class IteratorLowerer
             var collection = VisitExpression(node.Collection) ?? node.Collection;
             var enumeratorLocal = CreateHoistedTempLocal("forEnumerator", getEnumeratorMethod.ReturnType);
 
-            var body = VisitLoopBody(node.Body, breakLabel, continueLabel, sourceLabels);
+            var firstState = _states.Count;
+            BoundBlockStatement? finallyBlock = null;
+            FinallyFrame? frame = null;
+            if (UseDisposalUtilities.TryResolveUseDisposeMethod(_compilation, getEnumeratorMethod.ReturnType, preferAsync: false, out var disposeMethod, out var useAwait) && disposeMethod is not null)
+            {
+                var dispose = UseDisposalUtilities.CreateDisposeInvocationExpression(_compilation, CreateHoistedAccess(enumeratorLocal), disposeMethod, useAwait);
+                finallyBlock = WrapFinallyBlock(new BoundBlockStatement([new BoundExpressionStatement(dispose)]));
+                frame = new FinallyFrame { FinallyBlock = finallyBlock };
+                _finallyStack.Push(frame);
+            }
+            BoundStatement body;
+            try
+            {
+                body = VisitLoopBody(node.Body, breakLabel, continueLabel, sourceLabels);
+            }
+            finally
+            {
+                if (frame is not null)
+                    _finallyStack.Pop();
+            }
 
             var currentValue = new BoundInvocationExpression(
                 currentGetter,
@@ -1708,7 +1767,13 @@ internal static class IteratorLowerer
                 new BoundLabeledStatement(breakLabel, new BoundBlockStatement(Array.Empty<BoundStatement>())),
             };
 
-            return new BoundBlockStatement(statements);
+            if (finallyBlock is null)
+                return new BoundBlockStatement(statements);
+
+            return new BoundBlockStatement([
+                statements[0],
+                ProtectIteratorRegion(new BoundTryStatement(new BoundBlockStatement(statements.Skip(1)), [], finallyBlock), firstState),
+            ]);
         }
 
         private readonly record struct StateEntry(int Value, ILabelSymbol Label);

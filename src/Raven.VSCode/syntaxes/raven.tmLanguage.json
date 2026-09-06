@@ -678,7 +678,7 @@
                 },
                 {
                     "name": "keyword.control.flow.raven",
-                    "match": "\\b(return|yield|throw|goto|break|continue|expand|replace|introduce|fragment|token)\\b"
+                    "match": "(?<=yield)\\s+from\\b|\\b(return|yield|throw|goto|break|continue|expand|replace|introduce|fragment|token)\\b"
                 },
                 {
                     "name": "keyword.control.async.raven",

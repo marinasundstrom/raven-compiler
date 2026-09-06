@@ -180,7 +180,7 @@ internal sealed partial class Lowerer
             BoundThrowExpression throwExpr => new BoundThrowStatement(throwExpr.Expression),
             BoundBreakExpression breakExpr => new BoundBreakStatement(breakExpr.TargetLabel),
             BoundContinueExpression continueExpr => new BoundContinueStatement(continueExpr.TargetLabel),
-            BoundYieldExpression yieldExpr => new BoundYieldStatement(yieldExpr.Expression, yieldExpr.ElementType, yieldExpr.IteratorKind),
+            BoundYieldExpression yieldExpr => new BoundYieldStatement(yieldExpr.Expression, yieldExpr.ElementType, yieldExpr.IteratorKind, yieldExpr.Iteration),
             BoundAssignmentExpression assignmentExpr => new BoundAssignmentStatement(assignmentExpr),
             _ => new BoundExpressionStatement(expression),
         };

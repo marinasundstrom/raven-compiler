@@ -9,6 +9,26 @@ namespace Raven.CodeAnalysis.Syntax.Tests;
 public class YieldStatementSyntaxTests
 {
     [Fact]
+    public void ParsesYieldFromStatement()
+    {
+        var tree = SyntaxTree.ParseText("yield from source\n");
+        var statement = tree.GetRoot().DescendantNodes().OfType<YieldStatementSyntax>().Single();
+        Assert.Empty(tree.GetDiagnostics());
+        Assert.Equal("from", statement.FromKeyword.Text);
+        Assert.Equal("source", Assert.IsType<IdentifierNameSyntax>(statement.Expression).Identifier.Text);
+        Assert.Equal("yield from source\n", tree.GetRoot().ToFullString());
+    }
+
+    [Fact]
+    public void ParsesYieldFromExpression()
+    {
+        var tree = SyntaxTree.ParseText("let done = (yield from source)\n");
+        var expression = tree.GetRoot().DescendantNodes().OfType<YieldExpressionSyntax>().Single();
+        Assert.Empty(tree.GetDiagnostics());
+        Assert.Equal("from", expression.FromKeyword.Text);
+    }
+
+    [Fact]
     public void YieldReturnForm_ReportsMigrationDiagnostic()
     {
         var tree = SyntaxTree.ParseText("yield return value\n");

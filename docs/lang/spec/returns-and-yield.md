@@ -105,6 +105,51 @@ An unannotated function expression containing `yield` infers
 `IEnumerable<T>`. An async function expression containing `yield` infers
 `IAsyncEnumerable<T>`.
 
+## Delegating with `yield from`
+
+`yield from source` enumerates `source` and publishes each element through the
+current iterator. It is valid both as a statement and as an expression. The
+expression evaluates to `unit` after the delegated sequence completes.
+
+```raven
+func FirstGenerator() -> IEnumerable<int> {
+    yield 42
+    yield from SecondGenerator()
+}
+
+func SecondGenerator() -> IEnumerable<int> {
+    yield 1
+    yield 2
+    yield 3
+}
+```
+
+Synchronous delegation has the semantics of `for item in source { yield item }`.
+The source is evaluated once when execution reaches the delegation; enumeration
+is lazy and resumes only when the consumer requests another element. Each source
+element must be implicitly convertible to the enclosing iterator's element type.
+An empty source produces no elements, and execution continues after delegation.
+`from` is contextual immediately after `yield`.
+
+Inside an async iterator, an asynchronously enumerable source uses asynchronous
+enumeration; a synchronously enumerable source uses synchronous enumeration.
+When both protocols are available, the asynchronous protocol takes precedence.
+A synchronous iterator cannot delegate to an asynchronous source.
+
+Iterator lifecycle behavior follows C# iterator and async-iterator semantics:
+normal completion, exceptions, and early consumer disposal all run the active
+enumerator's cleanup. Async cleanup is awaited, including when the consumer
+calls `DisposeAsync` while suspended at a yield. Cleanup does not run merely
+because an element was yielded. Delegation does not buffer the sequence or block
+on asynchronous operations.
+
+Async delegation forwards the enclosing iterator's effective
+`[EnumeratorCancellation]` token to the delegated `GetAsyncEnumerator` when that
+protocol accepts a token. This includes the combined token described below.
+Without a marked parameter, the existing iterator cancellation policy applies:
+no consumer token is implicitly captured. Cancellation remains cooperative;
+delegation does not insert cancellation checks between synchronous elements.
+
 ## Cancellation in async iterators
 
 An async iterator may receive the cancellation token passed by its consumer to

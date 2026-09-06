@@ -81,6 +81,9 @@ public interface IReturnOperation : IOperation
 
 public interface IYieldOperation : IOperation
 {
+    /// <summary>Whether this yield delegates to a sequence.</summary>
+    bool IsDelegating { get; }
+
     IOperation? ReturnedValue { get; }
 
     ITypeSymbol ElementType { get; }

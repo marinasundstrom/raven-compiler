@@ -377,6 +377,8 @@ internal sealed class YieldExpressionOperation : Operation, IYieldOperation
     public IOperation? ReturnedValue => _returnedValue ??=
         SemanticModel.GetOperation(((YieldExpressionSyntax)Syntax).Expression);
 
+    public bool IsDelegating => _bound.Iteration is not null;
+
     public ITypeSymbol ElementType => _bound.ElementType;
 
     protected override ImmutableArray<IOperation> GetChildrenCore()
@@ -403,6 +405,8 @@ internal sealed class YieldOperation : Operation, IYieldOperation
         YieldStatementSyntax yieldStatement when yieldStatement.Expression is { } expression => SemanticModel.GetOperation(expression),
         _ => null,
     };
+
+    public bool IsDelegating => _bound.Iteration is not null;
 
     public ITypeSymbol ElementType => _bound.ElementType;
 

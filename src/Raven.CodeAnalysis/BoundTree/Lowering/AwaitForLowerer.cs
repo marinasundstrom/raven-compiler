@@ -34,7 +34,6 @@ internal static class AwaitForLowerer
         private readonly Compilation _compilation;
         private readonly ITypeSymbol _unitType;
         private int _tempCounter;
-        private int _labelCounter;
 
         public Rewriter(ISymbol containingSymbol, Compilation compilation)
         {
@@ -42,6 +41,8 @@ internal static class AwaitForLowerer
             _compilation = compilation;
             _unitType = compilation.GetSpecialType(SpecialType.System_Unit);
         }
+
+        public override BoundNode? VisitFunctionExpression(BoundFunctionExpression node) => node;
 
         public override BoundNode? VisitForStatement(BoundForStatement node)
         {
@@ -66,14 +67,20 @@ internal static class AwaitForLowerer
 
             var enumeratorType = getAsyncEnumeratorMethod.ReturnType;
             var enumeratorLocal = CreateTempLocal("asyncEnumerator", enumeratorType);
-            var hasNextLocal = CreateTempLocal("asyncHasNext", _compilation.GetSpecialType(SpecialType.System_Boolean));
-            var continueLabel = CreateLabel("awaitfor_continue");
-            var breakLabel = CreateLabel("awaitfor_break");
 
             BoundExpression getEnumeratorInvocation;
             var optionalArguments = getAsyncEnumeratorMethod.Parameters
                 .Select(static parameter => (BoundExpression)new BoundDefaultValueExpression(parameter.Type))
                 .ToArray();
+
+            if (node.Iteration.CancellationToken is { } cancellationToken)
+            {
+                for (var index = 0; index < getAsyncEnumeratorMethod.Parameters.Length; index++)
+                {
+                    if (AsyncIteratorCancellationUtilities.IsCancellationTokenParameter(_compilation, getAsyncEnumeratorMethod.Parameters[index]))
+                        optionalArguments[index] = VisitExpression(cancellationToken)!;
+                }
+            }
 
             if (getAsyncEnumeratorMethod.IsExtensionMethod)
             {
@@ -96,26 +103,13 @@ internal static class AwaitForLowerer
 
             statements.Add(new BoundLocalDeclarationStatement(
                 new[] { new BoundVariableDeclarator(enumeratorLocal, getEnumeratorInvocation) }));
-            statements.Add(new BoundLocalDeclarationStatement(
-                new[] { new BoundVariableDeclarator(hasNextLocal, initializer: null) }));
 
             var moveNextInvocation = new BoundInvocationExpression(
                 moveNextAsyncMethod,
                 Array.Empty<BoundExpression>(),
                 receiver: new BoundLocalAccess(enumeratorLocal));
             var moveNextAwait = ConvertToBoolIfNeeded(CreateAwaitExpression(moveNextInvocation));
-            var assignHasNext = new BoundAssignmentStatement(
-                new BoundLocalAssignmentExpression(
-                    hasNextLocal,
-                    new BoundLocalAccess(hasNextLocal),
-                    moveNextAwait,
-                    _unitType));
-
-            var loopBodyStatements = new List<BoundStatement>
-            {
-                assignHasNext,
-                new BoundConditionalGotoStatement(breakLabel, new BoundLocalAccess(hasNextLocal), jumpIfTrue: false),
-            };
+            var loopBodyStatements = new List<BoundStatement>();
 
             if (node.Local is not null)
             {
@@ -137,10 +131,19 @@ internal static class AwaitForLowerer
             }
 
             loopBodyStatements.Add(body);
-            loopBodyStatements.Add(new BoundGotoStatement(continueLabel, isBackward: true));
-
-            statements.Add(new BoundLabeledStatement(continueLabel, new BoundBlockStatement(loopBodyStatements)));
-            statements.Add(new BoundLabeledStatement(breakLabel, new BoundBlockStatement(Array.Empty<BoundStatement>())));
+            var loop = new BoundBlockStatement([
+                new BoundWhileStatement(moveNextAwait, new BoundBlockStatement(loopBodyStatements)),
+            ]);
+            if (node.Iteration.DisposeAsyncMethod is { } disposeAsyncMethod)
+            {
+                var dispose = new BoundInvocationExpression(disposeAsyncMethod, [], receiver: new BoundLocalAccess(enumeratorLocal));
+                var cleanup = new BoundBlockStatement([new BoundExpressionStatement(CreateAwaitExpression(dispose))]);
+                statements.Add(new BoundTryStatement(loop, [], cleanup));
+            }
+            else
+            {
+                statements.Add(loop);
+            }
             return new BoundBlockStatement(statements);
         }
 
@@ -153,20 +156,6 @@ internal static class AwaitForLowerer
                 name,
                 type,
                 isMutable: true,
-                _containingSymbol,
-                containingType,
-                containingNamespace,
-                [Location.None],
-                Array.Empty<SyntaxReference>());
-        }
-
-        private ILabelSymbol CreateLabel(string nameHint)
-        {
-            var containingType = _containingSymbol.ContainingType as INamedTypeSymbol;
-            var containingNamespace = _containingSymbol.ContainingNamespace;
-            var name = $"<{nameHint}>__awaitfor_{_labelCounter++}";
-            return new LabelSymbol(
-                name,
                 _containingSymbol,
                 containingType,
                 containingNamespace,

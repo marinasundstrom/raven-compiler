@@ -1,0 +1,7 @@
+<Project Sdk="Raven.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>YieldFrom</AssemblyName>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+</Project>

@@ -3599,13 +3599,13 @@ internal static class AsyncLowerer
         public BoundBlockStatement Rewrite(BoundBlockStatement body)
             => (BoundBlockStatement)VisitBlockStatement(body)!;
 
-        public override BoundNode? VisitAssignmentExpression(BoundAssignmentExpression node)
+        public override BoundNode? VisitFieldAssignmentExpression(BoundFieldAssignmentExpression node)
         {
             if (node is not BoundFieldAssignmentExpression fieldAssignment ||
                 fieldAssignment.Field.ContainingType is not { } containingType ||
                 !SymbolEqualityComparer.Default.Equals(containingType, _iteratorType))
             {
-                return base.VisitAssignmentExpression(node);
+                return base.VisitFieldAssignmentExpression(node);
             }
 
             var receiver = new BoundMemberAccessExpression(
@@ -3613,9 +3613,9 @@ internal static class AsyncLowerer
                 _iteratorField);
             var right = (BoundExpression)(VisitExpression(fieldAssignment.Right) ?? fieldAssignment.Right);
 
-            return new BoundMemberAssignmentExpression(
-                fieldAssignment.Field,
+            return new BoundFieldAssignmentExpression(
                 receiver,
+                fieldAssignment.Field,
                 right,
                 fieldAssignment.UnitType);
         }
@@ -4328,7 +4328,9 @@ internal static class AsyncLowerer
             TaskOfT is not null &&
             SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, TaskOfT);
 
-        public bool IsSupported => IsTask || IsTaskOfT;
+        public bool IsValueTask => AsyncReturnTypeUtilities.IsNonGenericValueTask(AsyncReturnType);
+
+        public bool IsSupported => IsTask || IsTaskOfT || IsValueTask;
     }
 
     private sealed class AwaitlessAsyncRewriter : BoundTreeRewriter
@@ -4502,6 +4504,9 @@ internal static class AsyncLowerer
 
         private BoundExpression? CreateCompletedTaskAccess()
         {
+            if (_returnInfo.IsValueTask)
+                return new BoundDefaultValueExpression(_returnInfo.AsyncReturnType);
+
             if (!SymbolEqualityComparer.Default.Equals(_returnInfo.ResultType, _unitType))
                 return null;
 
@@ -4583,6 +4588,18 @@ internal static class AsyncLowerer
             }
 
             base.VisitExpression(node);
+        }
+
+        public override void VisitYieldStatement(BoundYieldStatement node)
+        {
+            FoundAwait |= node.Iteration?.Kind == ForIterationKind.Async;
+            base.VisitYieldStatement(node);
+        }
+
+        public override void VisitYieldExpression(BoundYieldExpression node)
+        {
+            FoundAwait |= node.Iteration?.Kind == ForIterationKind.Async;
+            base.VisitYieldExpression(node);
         }
 
         public override void VisitAwaitExpression(BoundAwaitExpression node)
