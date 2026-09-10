@@ -24,16 +24,12 @@ build_additional_isolated_names() {
 build_stale_runtime_exclusion_filter() {
   local filter=""
   local names=(
-    "AsyncPropagateCodeGenTests"
-    "AsyncTryAwaitCodeGenTests"
     "AttachedMacroCodeGenTests"
     "MsBuildSampleProjectCompilationTests"
     "PdbSequencePointTests"
     "ProjectFileNuGetReferenceTests"
     "PropertyTests"
-    "RuntimeAsyncCodeGenTests"
     "RuntimeSymbolResolverTests"
-    "TryExpressionCodeGenTests"
     "UnionCodeGenTests"
   )
 

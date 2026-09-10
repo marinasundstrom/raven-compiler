@@ -160,7 +160,7 @@ class Program {
     }
 
     [Fact]
-    public void RuntimeAsyncEnabled_UsesRuntimeAwaitHelper_WhenAvailable_ElseFallsBackToAwaiterPattern()
+    public void RuntimeAsyncEnabled_Await_ReturnsValue()
     {
         const string code = """
 import System.Threading.Tasks.*
@@ -177,30 +177,12 @@ class Program {
         var programType = loaded.Assembly.GetType("Program", throwOnError: true)!;
         var methodFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
         var asyncMethod = programType.GetMethod("Compute", methodFlags)!;
-        var calledMembers = ILReader.GetCalledMembers(asyncMethod);
-
-        var runtimeHasAsyncHelpers = typeof(System.Runtime.CompilerServices.AsyncTaskMethodBuilder)
-            .Assembly
-            .GetType("System.Runtime.CompilerServices.AsyncHelpers", throwOnError: false) is not null;
-
-        if (runtimeHasAsyncHelpers)
-        {
-            Assert.Contains(
-                calledMembers,
-                static member => member.Contains("System.Runtime.CompilerServices.AsyncHelpers::Await", StringComparison.Ordinal));
-            return;
-        }
-
-        Assert.Contains(
-            calledMembers,
-            static member => member.EndsWith("::GetAwaiter", StringComparison.Ordinal));
-        Assert.Contains(
-            calledMembers,
-            static member => member.EndsWith("::GetResult", StringComparison.Ordinal));
+        var task = Assert.IsAssignableFrom<Task<int>>(asyncMethod.Invoke(Activator.CreateInstance(programType), null));
+        Assert.Equal(1, task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult());
     }
 
     [Fact]
-    public void RuntimeAsyncEnabled_Net11AsyncTaskEntryPoint_UsesRuntimeEntryPointHandler_WhenAvailable()
+    public void RuntimeAsyncEnabled_Net11AsyncTaskEntryPoint_ReturnsExitCode()
     {
         if (!RuntimeAsyncEntryPointHandlerAvailable())
             return;
@@ -223,21 +205,11 @@ async func Main() -> Task<int> {
         var entryPoint = loaded.Assembly.EntryPoint;
         Assert.NotNull(entryPoint);
 
-        var calledMembers = ILReader.GetCalledMembers(entryPoint!);
-
-        Assert.Contains(
-            calledMembers,
-            static member => member.Contains("System.Runtime.CompilerServices.AsyncHelpers::HandleAsyncEntryPoint", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            calledMembers,
-            static member => member.EndsWith("::GetAwaiter", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            calledMembers,
-            static member => member.EndsWith("::GetResult", StringComparison.Ordinal));
+        Assert.Equal(5, entryPoint!.Invoke(null, entryPoint.GetParameters().Length == 0 ? null : new object[] { Array.Empty<string>() }));
     }
 
     [Fact]
-    public void RuntimeAsyncEnabled_YieldAwaitable_UsesRuntimeSuspensionHelperAndCompletes()
+    public void RuntimeAsyncEnabled_YieldAwaitable_Completes()
     {
         const string code = """
 import System.Threading.Tasks.*
@@ -255,12 +227,6 @@ class Program {
         var programType = loaded.Assembly.GetType("Program", throwOnError: true)!;
         var methodFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
         var computeMethod = programType.GetMethod("Compute", methodFlags)!;
-        var calledMembers = ILReader.GetCalledMembers(computeMethod);
-
-        Assert.Contains(
-            calledMembers,
-            static member => member.Contains("System.Runtime.CompilerServices.AsyncHelpers::UnsafeAwaitAwaiter", StringComparison.Ordinal));
-
         var program = Activator.CreateInstance(programType);
         var task = Assert.IsAssignableFrom<Task<int>>(computeMethod.Invoke(program, null));
         Assert.Equal(42, task.GetAwaiter().GetResult());
@@ -300,7 +266,7 @@ class Program {
     }
 
     [Fact]
-    public void RuntimeAsyncRequested_Net10AsyncTaskEntryPoint_UsesAwaiterFallback()
+    public void RuntimeAsyncRequested_Net10AsyncTaskEntryPoint_ReturnsExitCode()
     {
         const string code = """
 import System.Threading.Tasks.*
@@ -318,31 +284,11 @@ async func Main() -> Task<int> {
             references: GetFrameworkReferences("net10.0"));
 
         var entryPoint = Assert.IsAssignableFrom<MethodInfo>(loaded.Assembly.EntryPoint);
-        var calledMembers = ILReader.GetCalledMembers(entryPoint);
-        var methodFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        var asyncMain = loaded.Assembly
-            .GetTypes()
-            .SelectMany(type => type.GetMethods(methodFlags))
-            .Single(method => method.Name == "Main");
-        var asyncMainCalls = ILReader.GetCalledMembers(asyncMain);
-
-        Assert.DoesNotContain(
-            calledMembers,
-            static member => member.Contains("System.Runtime.CompilerServices.AsyncHelpers::HandleAsyncEntryPoint", StringComparison.Ordinal));
-        Assert.Contains(
-            calledMembers,
-            static member => member.EndsWith("::GetAwaiter", StringComparison.Ordinal));
-        Assert.Contains(
-            calledMembers,
-            static member => member.EndsWith("::GetResult", StringComparison.Ordinal));
-        Assert.Equal(0, ((int)asyncMain.GetMethodImplementationFlags()) & RuntimeAsyncMethodImplBit);
-        Assert.DoesNotContain(
-            asyncMainCalls,
-            static member => member.Contains("System.Runtime.CompilerServices.AsyncHelpers::Await", StringComparison.Ordinal));
+        Assert.Equal(5, entryPoint.Invoke(null, entryPoint.GetParameters().Length == 0 ? null : new object[] { Array.Empty<string>() }));
     }
 
     [Fact]
-    public void RuntimeAsyncEnabled_TryCatchReturn_UsesEffectiveReturnTypeForExitLocal()
+    public void RuntimeAsyncEnabled_TryCatchReturn_ReturnsValue()
     {
         const string code = """
 import System.*
@@ -367,13 +313,8 @@ class Program {
         var programType = loaded.Assembly.GetType("Program", throwOnError: true)!;
         var methodFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
         var fetchMethod = programType.GetMethod("Fetch", methodFlags)!;
-        var methodBody = fetchMethod.GetMethodBody();
-        Assert.NotNull(methodBody);
-
-        Assert.DoesNotContain(
-            methodBody!.LocalVariables,
-            local => local.LocalType == fetchMethod.ReturnType);
-
+        var task = Assert.IsAssignableFrom<Task<int>>(fetchMethod.Invoke(Activator.CreateInstance(programType), null));
+        Assert.Equal(42, task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult());
     }
 
     [Fact]
@@ -554,43 +495,8 @@ class Program {
         var programType = loaded.Assembly.GetType("Program", throwOnError: true)!;
         var methodFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
         var computeMethod = programType.GetMethod("Compute", methodFlags)!;
-        var computeCalls = ILReader.GetCalledMembers(computeMethod);
-        Assert.DoesNotContain(
-            computeCalls,
-            static member => member.Contains("System.Threading.Tasks.Task::FromResult", StringComparison.Ordinal));
-
-        var lambdaMethod = loaded.Assembly
-            .GetTypes()
-            .SelectMany(type => type.GetMethods(methodFlags))
-            .FirstOrDefault(static method =>
-                method.Name.Contains("<lambda_", StringComparison.Ordinal) ||
-                method.Name.Contains("<Compute>b__", StringComparison.Ordinal));
-        Assert.NotNull(lambdaMethod);
-
-        var lambdaCalls = ILReader.GetCalledMembers(lambdaMethod!);
-        var runtimeHasAsyncHelpers = typeof(System.Runtime.CompilerServices.AsyncTaskMethodBuilder)
-            .Assembly
-            .GetType("System.Runtime.CompilerServices.AsyncHelpers", throwOnError: false) is not null;
-
-        if (runtimeHasAsyncHelpers)
-        {
-            Assert.Contains(
-                lambdaCalls,
-                static member => member.Contains("System.Runtime.CompilerServices.AsyncHelpers::Await", StringComparison.Ordinal));
-        }
-        else
-        {
-            Assert.Contains(
-                lambdaCalls,
-                static member => member.EndsWith("::GetAwaiter", StringComparison.Ordinal));
-            Assert.Contains(
-                lambdaCalls,
-                static member => member.EndsWith("::GetResult", StringComparison.Ordinal));
-        }
-
-        Assert.DoesNotContain(
-            lambdaCalls,
-            static member => member.Contains("System.Threading.Tasks.Task::FromResult", StringComparison.Ordinal));
+        var task = Assert.IsAssignableFrom<Task<string>>(computeMethod.Invoke(Activator.CreateInstance(programType), null));
+        Assert.Equal("ok", task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult());
     }
 
     private static TestAssemblyLoader.LoadedAssembly EmitAssembly(

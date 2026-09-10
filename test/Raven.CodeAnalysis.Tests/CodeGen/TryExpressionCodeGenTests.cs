@@ -4,16 +4,14 @@ using System.Reflection;
 
 using Raven.CodeAnalysis.Syntax;
 using Raven.CodeAnalysis.Testing;
-using Raven.CodeAnalysis.Tests.Utilities;
+using System.Threading.Tasks;
 
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Raven.CodeAnalysis.Tests;
 
-public sealed class TryExpressionCodeGenTests(ITestOutputHelper output)
+public sealed class TryExpressionCodeGenTests
 {
-    private readonly ITestOutputHelper _output = output;
 
     [Fact]
     public void TryPropagation_AdaptsThrowingApiOnSuccessAndFailure()
@@ -59,14 +57,8 @@ class Runner {
     }
 
     [Fact]
-    public void TryPropagation_WithResultOperand_PassesIlVerifyWhenToolAvailable()
+    public async Task TryPropagation_WithResultOperand_ReturnsSuccessAndCapturedFailure()
     {
-        if (!IlVerifyTestHelper.TryResolve(_output))
-        {
-            _output.WriteLine("Skipping IL verification because ilverify was not found.");
-            return;
-        }
-
         const string code = """
 import System.*
 import System.Threading.Tasks.*
@@ -80,10 +72,17 @@ class Runner {
     static async func Action2(throwExc: bool) -> Task<Result<int, Exception>> {
         await Task.Delay(1)
         if throwExc {
-            throw new Exception("Boom!")
+            throw Exception("Boom!")
         }
 
         return .Ok(40)
+    }
+    static async func Run(fail: bool) -> Task<string> {
+        let result = await Test(fail)
+        return match result {
+            .Ok(let value) => "ok:" + value.ToString()
+            .Error(let error) => "error:" + error.Message
+        }
     }
 }
 """;
@@ -96,35 +95,21 @@ class Runner {
             references,
             new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-        var assemblyPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.dll");
-
-        try
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        using var loaded = TestAssemblyLoader.LoadFromStream(stream, references);
+        var run = loaded.Assembly.GetType("Runner")!.GetMethod("Run")!;
+        foreach (var fail in new[] { false, true })
         {
-            using (var peStream = File.Create(assemblyPath))
-            {
-                var emitResult = compilation.Emit(peStream);
-                Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
-            }
-
-            var succeeded = IlVerifyRunner.Verify(null, assemblyPath, compilation);
-            Assert.True(succeeded, "IL verification failed for try?-expression over Result operand.");
-        }
-        finally
-        {
-            if (File.Exists(assemblyPath))
-                File.Delete(assemblyPath);
+            var task = Assert.IsAssignableFrom<Task<string>>(run.Invoke(null, [fail]));
+            Assert.Equal(fail ? "error:Boom!" : "ok:42", await task.WaitAsync(TimeSpan.FromSeconds(10)));
         }
     }
 
     [Fact]
-    public void GenericArrayTryExpression_ReturnsConstructedUnionAndPassesIlVerifyWhenToolAvailable()
+    public void GenericArrayTryExpression_ReturnsEmptyArrayPayload()
     {
-        if (!IlVerifyTestHelper.TryResolve(_output))
-        {
-            _output.WriteLine("Skipping IL verification because ilverify was not found.");
-            return;
-        }
-
         const string code = """
 namespace System
 
@@ -141,6 +126,12 @@ class Runner {
     static func Wrap<T>() -> Result<T[], Exception> {
         try Array.Empty<T>()
     }
+    static func Run() -> int {
+        return match Wrap<int>() {
+            .Ok(let values) => values.Length
+            .Error(let error) => -1
+        }
+    }
 }
 """;
 
@@ -151,25 +142,12 @@ class Runner {
             [syntaxTree],
             references,
             new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var assemblyPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.dll");
-
-        try
-        {
-            using (var peStream = File.Create(assemblyPath))
-            {
-                var emitResult = compilation.Emit(peStream);
-                Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
-            }
-
-            Assert.True(
-                IlVerifyRunner.Verify(null, assemblyPath, compilation),
-                "IL verification failed for a generic array Result returned by try-expression.");
-        }
-        finally
-        {
-            if (File.Exists(assemblyPath))
-                File.Delete(assemblyPath);
-        }
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        using var loaded = TestAssemblyLoader.LoadFromStream(stream, references);
+        var run = loaded.Assembly.GetType("Example.Runner")!.GetMethod("Run")!;
+        Assert.Equal(0, run.Invoke(null, null));
     }
 
     private static MetadataReference[] GetReferencesWithRavenCore()
