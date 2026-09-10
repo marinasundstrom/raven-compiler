@@ -867,7 +867,7 @@ internal partial class PENamedTypeSymbol : PESymbol, INamedTypeSymbol
         }
     }
 
-    public INamedTypeSymbol? BaseType => _baseType ??= (_typeInfo.BaseType is not null ? (INamedTypeSymbol?)PEContainingModule.GetType(_typeInfo.BaseType) : null);
+    public INamedTypeSymbol? BaseType => _baseType ??= (_typeInfo.BaseType is not null ? (INamedTypeSymbol?)_reflectionTypeLoader.ResolveType(_typeInfo.BaseType) : null);
 
     public TypeKind TypeKind { get; }
 

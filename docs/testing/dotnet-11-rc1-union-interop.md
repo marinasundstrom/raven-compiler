@@ -100,8 +100,8 @@ classification, closed-class round-trips, and malformed-body rejection. Both
 modes pass in `AspNetCoreUnionInteropTests`; generated mode also checks that RDG
 produced source without fallback diagnostics. OpenAPI checks pass in both modes
 and verify boolean/string alternatives, structural object-case schemas, and
-closed-class discriminator mappings. SignalR and Blazor remain follow-ups. Dedicated qualification below found gaps in C# `IUnionMembers` providers and
-constructed generic closed-family matching. Universal interoperability is not
+closed-class discriminator mappings. SignalR and Blazor remain follow-ups. Dedicated qualification below found a gap in C# `IUnionMembers` providers and
+identified the now-fixed constructed generic base-type defect. Universal interoperability is not
 yet established.
 
 ### Completed RC 1 release-gate pass
@@ -166,14 +166,19 @@ public sealed record GenericCreated<T>(T Value) : GenericEvent<T>;
 public sealed record GenericRemoved<T> : GenericEvent<T>;
 ```
 
-imports, but a Raven match over `GenericEvent<int>` with arms for
-`GenericCreated<int>` and `GenericRemoved<int>` reports RAV2102 for the patterns
-and RAV2100 for missing open `GenericCreated<T>` / `GenericRemoved<T>` cases.
-The probe therefore does **not** qualify generic-family exhaustiveness. Fixing
-projection and generic-base identity must precede a claim of compatibility;
-follow it with constrained, specialized, reordered-parameter, and unbound-case
-coverage. The earlier passing tests for hoisted Raven cases prove metadata
-loadability and execution, not this C# generic matching contract.
+previously imported, but matching `GenericEvent<int>` reported RAV2102 for
+constructed patterns and RAV2100 for missing open cases. This defect is now fixed:
+metadata base types use constructed-type resolution, and constructed symbols
+substitute their own arguments into the base. The regression covers complete
+and incomplete matches, reordered parameters (`Reversed<TSecond, TFirst>`),
+and execution after reloading the emitted Raven assembly. All 84 focused
+interop, sealed-hierarchy, and constructed-type checks pass on RC 1.
+
+This establishes ordinary direct generic-family matching. Specialized cases,
+constraints, and cases with uninferred type parameters still need dedicated
+qualification before claiming complete agreement with every C# closed-family
+exhaustiveness rule. The earlier hoisted-case tests separately prove Raven
+metadata loadability and execution.
 
 ## Provider-union qualification
 

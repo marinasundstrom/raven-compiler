@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Imported generic base types preserve and substitute their type arguments.
+  C# closed generic families now support matching constructed cases, including
+  reordered generic parameters, and report missing constructed cases correctly.
+
 - Sealed interfaces now publish Raven's permitted-family metadata on both .NET 10
   and .NET 11, preserving closed-family information for Raven consumers and
   rejecting external implementations. Closed-family metadata also names hoisted

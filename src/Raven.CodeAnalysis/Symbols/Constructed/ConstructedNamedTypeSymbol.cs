@@ -27,6 +27,7 @@ internal sealed class ConstructedNamedTypeSymbol : INamedTypeSymbol, IUnionSymbo
     private ImmutableArray<ITypeSymbol>? _memberTypes;
     private ImmutableArray<IParameterSymbol>? _constructorParameters;
     private ImmutableArray<ITypeParameterSymbol> _typeParameters;
+    private INamedTypeSymbol? _baseType;
     private IUnionSymbol? _union;
     private IFieldSymbol? _discriminatorField;
     private IFieldSymbol? _payloadField;
@@ -1035,7 +1036,9 @@ internal sealed class ConstructedNamedTypeSymbol : INamedTypeSymbol, IUnionSymbo
     public int Arity => _originalDefinition.Arity;
     public ImmutableArray<ITypeSymbol> GetTypeArguments() => TypeArguments;
     public ITypeSymbol? OriginalDefinition => _originalDefinition;
-    public INamedTypeSymbol? BaseType => _originalDefinition.BaseType;
+    public INamedTypeSymbol? BaseType => _baseType ??= _originalDefinition.BaseType is { } baseType
+        ? Substitute(baseType) as INamedTypeSymbol
+        : null;
     public ImmutableArray<ITypeParameterSymbol> TypeParameters =>
         _typeParameters.IsDefault ? _typeParameters = BuildTypeParameters() : _typeParameters;
     public ITypeSymbol? ConstructedFrom { get; }

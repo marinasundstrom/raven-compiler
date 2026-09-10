@@ -263,6 +263,9 @@ public sealed class CSharpUnionInteropTests
                 public closed record GenericEvent<T>;
                 public sealed record GenericCreated<T>(T Value) : GenericEvent<T>;
                 public sealed record GenericRemoved<T> : GenericEvent<T>;
+                public closed record PairEvent<TFirst, TSecond>;
+                public sealed record Reversed<TSecond, TFirst> : PairEvent<TFirst, TSecond>;
+
 
 
                 public closed record Event;
@@ -360,6 +363,58 @@ public sealed class CSharpUnionInteropTests
             Assert.True(genericEvent.IsSealedHierarchy);
             Assert.Equal(["GenericCreated", "GenericRemoved"],
                 genericEvent.PermittedDirectSubtypes.Select(type => type.Name).Order());
+
+            foreach (var (arms, exhaustive) in new[]
+            {
+                ("GenericCreated<int> => 1\n GenericRemoved<int> => 2", true),
+                ("GenericCreated<int> => 1", false)
+            })
+            {
+                var tree = SyntaxTree.ParseText($$"""
+                    import CSharpUnionFixture.*
+                    public class GenericEvaluator {
+                        public static func Evaluate(value: GenericEvent<int>) -> int {
+                            return match value { {{arms}} }
+                        }
+                        public static func Reorder(value: PairEvent<int, string>) -> int {
+                            return match value { Reversed<string, int> => 3 }
+                        }
+                    }
+                    """);
+                var consumer = Compilation.Create("GenericConsumer", [tree],
+                    [.. net11References, MetadataReference.CreateFromFile(referencePath)],
+                    new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                var diagnostics = consumer.GetDiagnostics();
+                Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error &&
+                    diagnostic.Descriptor != CompilerDiagnostics.MatchExpressionNotExhaustive);
+                var model = consumer.GetSemanticModel(tree);
+                var match = tree.GetRoot().DescendantNodes().OfType<MatchExpressionSyntax>().First();
+                Assert.Equal(exhaustive, model.GetMatchExhaustiveness(match).IsExhaustive);
+                if (!exhaustive)
+                    Assert.Contains("GenericRemoved<int>", model.GetMatchExhaustiveness(match).MissingCases);
+                else
+                {
+                    using var emitted = new MemoryStream();
+                    var emit = consumer.Emit(emitted);
+                    Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+                    emitted.Position = 0;
+                    var loadContext = new System.Runtime.Loader.AssemblyLoadContext("generic-closed-interop", isCollectible: true);
+                    try
+                    {
+                        var fixture = loadContext.LoadFromAssemblyPath(referencePath);
+                        var assembly = loadContext.LoadFromStream(emitted);
+                        var evaluator = assembly.GetType("GenericEvaluator")!;
+                        var created = fixture.GetType("CSharpUnionFixture.GenericCreated`1")!.MakeGenericType(typeof(int));
+                        Assert.Equal(1, evaluator.GetMethod("Evaluate")!.Invoke(null, [Activator.CreateInstance(created, 42)]));
+                        var reversed = fixture.GetType("CSharpUnionFixture.Reversed`2")!.MakeGenericType(typeof(string), typeof(int));
+                        Assert.Equal(3, evaluator.GetMethod("Reorder")!.Invoke(null, [Activator.CreateInstance(reversed)]));
+                    }
+                    finally
+                    {
+                        loadContext.Unload();
+                    }
+                }
+            }
 
             var foo = fixtureNamespace.GetMembers("Foo").OfType<IUnionSymbol>().Single();
 

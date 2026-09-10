@@ -253,6 +253,10 @@ explicitly enabled. Raven imports this marker from C# assemblies and discovers
 direct subclasses in the declaring module; deriving from an imported closed
 root is an error.
 
+Imported generic base types retain their type arguments. Constructing a case
+substitutes those arguments into its base, including reordered parameters, so
+matching a constructed closed root uses constructed case types.
+
 Closed interfaces are a Raven extension, outside C# 15's closed-class contract.
 They retain Raven's `ClosedHierarchyAttribute(Type[])` metadata, as do targets
 whose reference assemblies do not provide `IsClosedTypeAttribute`.
