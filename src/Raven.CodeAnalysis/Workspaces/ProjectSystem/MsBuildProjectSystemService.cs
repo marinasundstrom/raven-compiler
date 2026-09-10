@@ -232,6 +232,7 @@ public sealed class MsBuildProjectSystemService : IProjectSystemService
         foreach (var metadataReferencePath in evaluation.MetadataReferencePaths)
             solution = solution.AddMetadataReference(projectId, MetadataReference.CreateFromFile(metadataReferencePath));
 
+        var compilerSupportReferenceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var compilerSupportReferencePath in _compilerSupportReferencePaths)
         {
             var referenceName = Path.GetFileNameWithoutExtension(compilerSupportReferencePath);
@@ -241,6 +242,7 @@ public sealed class MsBuildProjectSystemService : IProjectSystemService
                 continue;
             }
 
+            compilerSupportReferenceNames.Add(referenceName);
             solution = solution.AddMetadataReference(
                 projectId,
                 MetadataReference.CreateFromFile(compilerSupportReferencePath));
@@ -255,10 +257,23 @@ public sealed class MsBuildProjectSystemService : IProjectSystemService
                 evaluation.FrameworkReferences,
                 _allowPackageRestore);
 
+            // Compiler support assemblies must also win in nested macro projects,
+            // which are compiled before the driver can normalize root references.
             foreach (var packageReference in packageReferences.MetadataReferences)
+            {
+                if (packageReference is PortableExecutableReference { FilePath: { } path } &&
+                    compilerSupportReferenceNames.Contains(Path.GetFileNameWithoutExtension(path)))
+                {
+                    continue;
+                }
+
                 solution = solution.AddMetadataReference(projectId, packageReference);
+            }
             foreach (var macroReference in packageReferences.MacroReferences)
-                solution = solution.AddMacroReference(projectId, macroReference);
+            {
+                if (!compilerSupportReferenceNames.Contains(Path.GetFileNameWithoutExtension(macroReference.Display)))
+                    solution = solution.AddMacroReference(projectId, macroReference);
+            }
             foreach (var analyzerReferencePath in packageReferences.AnalyzerReferencePaths)
             {
                 var assembly = ExtensionAssemblyLoader.LoadFromPath(analyzerReferencePath);

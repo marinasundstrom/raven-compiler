@@ -60,7 +60,10 @@ Primary MSBuild items Raven currently consumes:
 
 When the compiler builds a referenced Raven compiler-plugin project, it passes
 the same compiler-support references used by the top-level compilation into the
-nested project build. This lets a freshly restored macro project use
+nested project build. Selected compiler support assemblies take precedence over
+same-named package metadata and macro assets in these nested builds as well as
+in the root project. This prevents loading repository and packaged copies of a
+standard macro provider together. This lets a freshly restored macro project use
 `Raven.CodeAnalysis` and `Raven.Macros` without copying compiler installation
 paths into its project file. These references are compiler-provided build inputs;
 ordinary application and library dependencies continue to come from standard

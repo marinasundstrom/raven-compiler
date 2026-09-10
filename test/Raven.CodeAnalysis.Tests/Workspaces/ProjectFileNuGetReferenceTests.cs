@@ -215,8 +215,10 @@ public sealed class ProjectFileNuGetReferenceTests
         }
     }
 
-    [Fact]
-    public void OpenProject_MarkedPackageAssembly_AutomaticallyActivatesMacro()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OpenProject_MarkedPackageAssembly_AutomaticallyActivatesMacro(bool useCompilerSupportReference)
     {
         var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         var globalPackages = Path.Combine(root, "packages");
@@ -232,7 +234,11 @@ public sealed class ProjectFileNuGetReferenceTests
 
         Directory.CreateDirectory(Path.GetDirectoryName(packageAssemblyPath)!);
         Directory.CreateDirectory(sourceDirectory);
-        File.WriteAllBytes(packageAssemblyPath, EmitPackageMacroAssembly());
+        File.WriteAllBytes(packageAssemblyPath, EmitPackageMacroAssembly("Fake.Macro"));
+        var supportAssemblyPath = Path.Combine(root, "support", "Fake.Macro.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(supportAssemblyPath)!);
+        File.WriteAllBytes(supportAssemblyPath, EmitPackageMacroAssembly("Fake.Macro", "\"43\""));
+        var expectedAssemblyPath = useCompilerSupportReference ? supportAssemblyPath : packageAssemblyPath;
 
         var sourcePath = Path.Combine(sourceDirectory, "main.rvn");
         File.WriteAllText(sourcePath, "func Main() -> int => packageAnswer!{ }");
@@ -256,7 +262,15 @@ public sealed class ProjectFileNuGetReferenceTests
         Environment.SetEnvironmentVariable("NUGET_PACKAGES", globalPackages);
         try
         {
-            var workspace = RavenWorkspace.Create(targetFramework: TestMetadataReferences.TargetFramework);
+            var workspace = RavenWorkspace.Create(
+                targetFramework: TestMetadataReferences.TargetFramework,
+                projectSystemService: new MsBuildProjectSystemService(
+                    RavenProjectConventions.Default,
+                    resolvePackageReferences: true,
+                    requestedConfiguration: null,
+                    requestedTargetFramework: null,
+                    useHostFrameworkReferences: null,
+                    compilerSupportReferencePaths: useCompilerSupportReference ? [supportAssemblyPath] : []));
             var projectId = workspace.OpenProject(projectPath);
             var project = workspace.CurrentSolution.GetProject(projectId)!;
             var compilation = workspace.GetCompilation(projectId);
@@ -268,10 +282,10 @@ public sealed class ProjectFileNuGetReferenceTests
                 project.MetadataReferences.OfType<PortableExecutableReference>(),
                 reference => string.Equals(
                     reference.FilePath,
-                    packageAssemblyPath,
+                    expectedAssemblyPath,
                     StringComparison.OrdinalIgnoreCase));
             var macroReference = Assert.Single(compilation.MacroReferences);
-            Assert.Equal(Path.GetFullPath(packageAssemblyPath), macroReference.Display);
+            Assert.Equal(Path.GetFullPath(expectedAssemblyPath), macroReference.Display);
         }
         finally
         {
