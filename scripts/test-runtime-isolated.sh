@@ -35,7 +35,6 @@ build_stale_runtime_exclusion_filter() {
     "RuntimeAsyncCodeGenTests"
     "RuntimeSymbolResolverTests"
     "TryExpressionCodeGenTests"
-    "TypeOfExpressionCodeGenTests"
     "TypeResolutionPrecedenceTests"
     "UnionCodeGenTests"
   )

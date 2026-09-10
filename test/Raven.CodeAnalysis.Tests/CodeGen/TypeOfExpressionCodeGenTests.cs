@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 using Raven.CodeAnalysis.Syntax;
@@ -7,15 +8,21 @@ namespace Raven.CodeAnalysis.Tests;
 
 public class TypeOfExpressionCodeGenTests
 {
-    [Fact]
-    public void TypeOf_OpenGenericSourceType_ReturnsGenericTypeDefinition()
+    [Theory]
+    [InlineData("Box<>", null, true)]
+    [InlineData("Box<int>", null, false)]
+    [InlineData("System.Collections.Generic.List<>", typeof(List<>), true)]
+    [InlineData("System.Collections.Generic.List<int>", typeof(List<int>), false)]
+    [InlineData("System.Collections.Generic.Dictionary<,>", typeof(Dictionary<,>), true)]
+    public void TypeOf_GenericType_ReturnsExactRuntimeType(string operand, Type? metadataType, bool open)
     {
-        var code = """
+        var code = $$"""
+import System.*
 class Box<T> { }
 
 class Foo {
     public func Run() -> Type {
-        return typeof(Box<>)
+        return typeof({{operand}})
     }
 }
 """;
@@ -36,7 +43,9 @@ class Foo {
         var method = type.GetMethod("Run")!;
         var value = (Type)method.Invoke(instance, Array.Empty<object>())!;
 
-        Assert.True(value.IsGenericTypeDefinition);
-        Assert.Equal("Box`1", value.Name);
+        var sourceDefinition = loaded.Assembly.GetType("Box`1", throwOnError: true)!;
+        var expected = metadataType ?? (open ? sourceDefinition : sourceDefinition.MakeGenericType(typeof(int)));
+        Assert.Equal(expected, value);
+        Assert.Equal(open, value.IsGenericTypeDefinition);
     }
 }
