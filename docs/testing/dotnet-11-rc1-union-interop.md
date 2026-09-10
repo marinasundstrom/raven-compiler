@@ -94,8 +94,12 @@ per-run totals; overlapping filters must not be added into a unique-test count.
 | `scripts/test-target-framework-matrix.sh` | Core/Macros built for both targets; all three representative projects built and ran | `59d354cc7` |
 
 These are compiler, metadata, and JSON interoperability checks. They do not
-certify every ASP.NET Core integration. Dedicated HTTP binding, request-delegate
-generation, OpenAPI, SignalR, and Blazor checks remain follow-ups. C# custom
+certify every ASP.NET Core integration. Minimal API HTTP checks now cover both runtime and generated request delegates:
+boolean/string, nullable and asynchronous union responses, structural object-case
+classification, closed-class round-trips, and malformed-body rejection. Both
+modes pass in `AspNetCoreUnionInteropTests`; generated mode also checks that RDG
+produced source without fallback diagnostics. OpenAPI, SignalR, and Blazor checks
+remain follow-ups. C# custom
 `IUnionMembers` provider shapes and broader generic closed-family exhaustiveness
 also need dedicated qualification before claiming universal interoperability.
 
