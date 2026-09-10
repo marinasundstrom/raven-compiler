@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Async `use` resources are disposed before successful task completion, including
+  explicit returns from exception handlers and resources acquired after an await.
+  Hoisted resources now retain declaration order so cleanup runs in reverse order
+  on completion, exceptions, and cancellation.
 - Async delegate variables passed to `Task.Run` now select the payload-returning
   overload instead of unnecessarily nesting tasks. Delegate variance supports
   safe reference and nullable-return conversions, and equivalent generic

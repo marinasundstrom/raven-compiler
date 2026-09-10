@@ -188,13 +188,16 @@ each of these boundaries independently:
 
 ### Current stabilization findings
 
-The broad semantic and isolated runtime baselines pass on the current
-development line, but green totals hide skipped runtime cases that must be
-resolved or explicitly excluded from the compiler-writing subset:
+The previously recorded skipped runtime cases now have active behavior coverage:
 
-| Area | Current evidence | Required disposition |
-| --- | --- | --- |
-| Async resource lifetime across `await` | Legacy test is skipped pending replacement | Add current semantic/runtime coverage before relying on `use` in async compiler code |
+| Area | Current coverage |
+| --- | --- |
+| List pattern with a middle rest | `MatchExpressionCodeGenTests` checks empty and non-empty captures and inputs too short to match |
+| Positional/tuple patterns | `PositionalPatternCodeGenTests` executes declarations, assignments, matches, and mismatched inputs |
+| Nested async lambdas with captures | `AsyncFunctionExpressionStateMachineTests` executes direct and `Task.Run` invocation |
+| Async resource lifetime across `await` | `AsyncResourceLifetimeCodeGenTests` checks suspension, task completion, reverse disposal order, exceptions, and cancellation |
+
+Release and bootstrap qualification still require the complete gates above.
 
 The C# compiler source also identifies the following high-value translation
 families. Each family needs both a direct interop-shaped probe and, where the

@@ -564,52 +564,6 @@ class Program {
         EmitOnly(code);
     }
 
-    [Fact(Skip = "Legacy async disposal lowering case; replace with newer semantic coverage.")]
-    public void AsyncUse_DoesNotDisposeResourceBeforeAwaitResumes()
-    {
-        const string code = """
-import System.*
-import System.Threading.Tasks.*
-
-class Probe : IDisposable {
-    public var IsDisposed: bool = false
-
-    public async func ReadAsync() -> Task<int> {
-        await Task.Delay(10)
-
-        if self.IsDisposed {
-            throw Exception("disposed-too-early")
-        }
-
-        return 42
-    }
-
-    public func Dispose() -> () {
-        self.IsDisposed = true
-    }
-}
-
-class Program {
-    static async func Run() -> Task<Result<int, string>> {
-        use probe = Probe()
-
-        try {
-            let value = await probe.ReadAsync()
-            return .Ok(value)
-        } catch (Exception e) {
-            return .Error(e.Message)
-        }
-    }
-
-    static async func Main() -> Task {
-        let result = await Program.Run()
-        Console.WriteLine(result)
-    }
-}
-""";
-
-        EmitOnly(code);
-    }
 
     [Fact]
     public void AsyncOptionInvocation_NoneBranch_EmitsAndRuns()

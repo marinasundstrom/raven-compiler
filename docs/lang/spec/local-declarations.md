@@ -309,6 +309,11 @@ conversions.
 
 Resources created with `use` behave like ordinary locals: they remain in scope for the enclosing block and participate in definite-assignment rules. When control leaves the block, the resource is **automatically disposed**. Disposal occurs in **reverse declaration order**, ensuring that later resources observe earlier ones still alive.
 
+Suspending at `await` does not exit the resource scope. Resources remain alive
+until the scope exits, including by return, exception, or cancellation. An async
+function completes its task only after the required cleanup has finished. These
+rules also apply to resources acquired after an earlier await.
+
 When you need a narrower lifetime than the enclosing block, Raven also supports
 an explicit nested-scope form:
 

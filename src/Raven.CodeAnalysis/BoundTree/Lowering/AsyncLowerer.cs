@@ -766,7 +766,7 @@ internal static class AsyncLowerer
         var entryLabel = CreateLabel(stateMachine, "state");
 
         var lowerAfterAwaitRewrite = ContainsUsingDeclaration(originalBody);
-        var awaitRewriter = new AwaitLoweringRewriter(stateMachine, context.BuilderMembers);
+        var awaitRewriter = new AwaitLoweringRewriter(stateMachine, context.BuilderMembers, lowerAfterAwaitRewrite);
         var rewrittenBody = awaitRewriter.Rewrite(originalBody);
 
         // Await rewriting can expose propagation and other general constructs whose
@@ -793,17 +793,28 @@ internal static class AsyncLowerer
             awaitRewriter.Dispatches,
             guardEntryLabels));
 
-        var entryStatements = new List<BoundStatement>(rewrittenBody.Statements);
+        var entryStatements = awaitRewriter.CompletionLabel is null
+            ? new List<BoundStatement>(rewrittenBody.Statements)
+            : new List<BoundStatement> { rewrittenBody };
+        var completionStatements = new List<BoundStatement>();
         if (!stateMachine.HoistedLocalsToDispose.IsDefaultOrEmpty)
         {
             var disposeStatements = CreateDisposeStatements(
                 stateMachine,
                 EnumerateReverse(stateMachine.HoistedLocalsToDispose));
-            entryStatements.AddRange(disposeStatements);
+            completionStatements.AddRange(disposeStatements);
         }
 
-        entryStatements.AddRange(CreateCompletionStatements(context));
-        var entryBlock = new BoundBlockStatement(entryStatements, rewrittenBody.LocalsToDispose);
+        completionStatements.AddRange(CreateCompletionStatements(
+            context,
+            awaitRewriter.CompletionResult is { } resultLocal ? new BoundLocalAccess(resultLocal) : null));
+        if (awaitRewriter.CompletionLabel is { } completionLabel)
+            entryStatements.Add(new BoundLabeledStatement(completionLabel, new BoundBlockStatement(completionStatements)));
+        else
+            entryStatements.AddRange(completionStatements);
+        var entryBlock = new BoundBlockStatement(
+            entryStatements,
+            awaitRewriter.CompletionLabel is null ? rewrittenBody.LocalsToDispose : ImmutableArray<ILocalSymbol>.Empty);
 
         if (closureRewriter is not null)
             entryBlock = closureRewriter.Rewrite(entryBlock);
@@ -822,7 +833,15 @@ internal static class AsyncLowerer
             catchClauses,
             finallyBlock: null,
             BoundTryStatementKind.AsyncDispatchGuard);
-        var moveNextBody = new BoundBlockStatement(new BoundStatement[] { tryStatement });
+        var moveNextStatements = new List<BoundStatement>();
+        if (awaitRewriter.CompletionResult is { } completionResult)
+        {
+            moveNextStatements.Add(new BoundLocalDeclarationStatement([
+                new BoundVariableDeclarator(completionResult, new BoundDefaultValueExpression(completionResult.Type))
+            ]));
+        }
+        moveNextStatements.Add(tryStatement);
+        var moveNextBody = new BoundBlockStatement(moveNextStatements);
         return Lowerer.LowerBlock(stateMachine.MoveNextMethod, moveNextBody);
     }
 
@@ -994,11 +1013,11 @@ internal static class AsyncLowerer
         return new BoundIfStatement(condition, thenBlock);
     }
 
-    private static IEnumerable<BoundStatement> CreateCompletionStatements(MoveNextLoweringContext context)
+    private static IEnumerable<BoundStatement> CreateCompletionStatements(MoveNextLoweringContext context, BoundExpression? result = null)
     {
         yield return CreateStateAssignment(context.StateMachine, -2);
 
-        var setResult = CreateBuilderSetResultStatement(context.StateMachine, context.BuilderMembers, expression: null);
+        var setResult = CreateBuilderSetResultStatement(context.StateMachine, context.BuilderMembers, result);
         if (setResult is not null)
             yield return setResult;
 
@@ -1820,7 +1839,8 @@ internal static class AsyncLowerer
 
         public AwaitLoweringRewriter(
             SynthesizedAsyncStateMachineTypeSymbol stateMachine,
-            SynthesizedAsyncStateMachineTypeSymbol.BuilderMembers builderMembers)
+            SynthesizedAsyncStateMachineTypeSymbol.BuilderMembers builderMembers,
+            bool deferCompletion)
         {
             if (stateMachine is null)
                 throw new ArgumentNullException(nameof(stateMachine));
@@ -1830,7 +1850,32 @@ internal static class AsyncLowerer
             _nextHoistedLocalId = DetermineInitialHoistedLocalId(stateMachine);
             _nextAwaitResultId = 0;
             _nextAwaiterLocalId = 0;
+            if (deferCompletion)
+            {
+                CompletionLabel = new AsyncProtectedRegionExitLabelSymbol(
+                    "complete",
+                    stateMachine.MoveNextMethod,
+                    stateMachine,
+                    stateMachine.ContainingNamespace,
+                    [Location.None],
+                    []);
+                if (builderMembers.SetResult is { Parameters.Length: 1 } setResult)
+                {
+                    CompletionResult = new SourceLocalSymbol(
+                        "$asyncCompletionResult",
+                        SubstituteStateMachineTypeParameters(setResult.Parameters[0].Type),
+                        isMutable: true,
+                        stateMachine.MoveNextMethod,
+                        stateMachine,
+                        stateMachine.ContainingNamespace,
+                        [Location.None],
+                        []);
+                }
+            }
         }
+
+        public LabelSymbol? CompletionLabel { get; }
+        public SourceLocalSymbol? CompletionResult { get; }
 
         public ImmutableArray<StateDispatch> Dispatches => _dispatches.ToImmutableArray();
 
@@ -1839,9 +1884,9 @@ internal static class AsyncLowerer
             if (body is null)
                 throw new ArgumentNullException(nameof(body));
 
-            _hoistableLocals = AwaitCaptureWalker.Analyze(body);
+            _hoistableLocals = AwaitCaptureWalker.Analyze(body, out var declarationOrder);
 
-            foreach (var local in _hoistableLocals.Keys)
+            foreach (var local in declarationOrder)
                 AddHoistedLocal(local);
 
             var rewritten = RewriteBlockStatement(body, appendDisposeStatements: false);
@@ -2297,6 +2342,22 @@ internal static class AsyncLowerer
                     new BoundVariableDeclarator(resultLocal, resultExpression)
                 }));
                 resultExpression = new BoundLocalAccess(resultLocal);
+            }
+
+            if (CompletionLabel is { } completionLabel)
+            {
+                if (CompletionResult is { } completionResult && resultExpression is not null)
+                {
+                    statements.Add(new BoundAssignmentStatement(new BoundLocalAssignmentExpression(
+                        completionResult,
+                        new BoundLocalAccess(completionResult),
+                        resultExpression,
+                        _stateMachine.Compilation.UnitTypeSymbol)));
+                }
+                // Leave source scopes and exception handlers before disposing resources
+                // and publishing completion to callers awaiting the task.
+                statements.Add(new BoundGotoStatement(completionLabel));
+                return new BoundBlockStatement(statements, localsToDispose);
             }
 
             statements.Add(CreateStateAssignment(_stateMachine, -2));
@@ -3997,12 +4058,17 @@ internal static class AsyncLowerer
     {
         private readonly Stack<Scope> _scopes = new();
         private readonly Dictionary<ILocalSymbol, bool> _hoisted = new(ReferenceEqualityComparer.Instance);
+        private readonly List<ILocalSymbol> _declarationOrder = new();
+        private readonly HashSet<ILocalSymbol> _declaredLocals = new(ReferenceEqualityComparer.Instance);
 
         private AwaitCaptureWalker()
         {
         }
 
         public static ImmutableDictionary<ILocalSymbol, bool> Analyze(BoundNode body)
+            => Analyze(body, out _);
+
+        public static ImmutableDictionary<ILocalSymbol, bool> Analyze(BoundNode body, out ImmutableArray<ILocalSymbol> declarationOrder)
         {
             if (body is null)
                 throw new ArgumentNullException(nameof(body));
@@ -4025,6 +4091,7 @@ internal static class AsyncLowerer
             foreach (var pair in walker._hoisted)
                 builder.Add(pair.Key, pair.Value);
 
+            declarationOrder = walker._declarationOrder.Where(walker._hoisted.ContainsKey).ToImmutableArray();
             return builder.ToImmutable();
         }
 
@@ -4164,6 +4231,9 @@ internal static class AsyncLowerer
 
         private void DeclareLocal(ILocalSymbol local, bool isUsing)
         {
+            if (_declaredLocals.Add(local))
+                _declarationOrder.Add(local);
+
             if (_scopes.Count == 0)
                 _scopes.Push(new Scope(ImmutableArray<ILocalSymbol>.Empty));
 
