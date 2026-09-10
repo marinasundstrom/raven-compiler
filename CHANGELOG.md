@@ -6,6 +6,11 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- C# `IUnionMembers` providers now define imported union cases, factory
+  conversions, and pattern access through their nested interface. Generic
+  providers preserve inherited parameters and nullable contents; optional
+  accessors fall back to the provider's `Value`, not carrier-only members.
+
 - Imported generic base types preserve and substitute their type arguments.
   C# closed generic families now support matching constructed cases, including
   reordered generic parameters, and report missing constructed cases correctly.

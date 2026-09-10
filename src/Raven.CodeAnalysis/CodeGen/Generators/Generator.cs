@@ -323,6 +323,23 @@ internal abstract class Generator
                 return;
             }
 
+            if (conversion.MethodSymbol is { } factory)
+            {
+                var parameter = factory.Parameters[0];
+                var argumentType = parameter.GetByRefElementType();
+                PrepareUnionConstructorArgument(from, argumentType);
+                if (parameter.RefKind == RefKind.In)
+                {
+                    var argument = ILGenerator.DeclareLocal(ResolveClrType(argumentType));
+                    ILGenerator.Emit(OpCodes.Stloc, argument);
+                    ILGenerator.Emit(OpCodes.Ldloca, argument);
+                }
+                if (factory.IsAbstract)
+                    ILGenerator.Emit(OpCodes.Constrained, toClrType);
+                ILGenerator.Emit(OpCodes.Call, GetMethodInfo(factory));
+                return;
+            }
+
             ConstructorInfo? runtimeConstructor = null;
             try
             {
@@ -494,16 +511,17 @@ internal abstract class Generator
 
     private bool EmitExplicitUnionExtraction(INamedTypeSymbol unionType, ITypeSymbol memberType)
     {
-        var tryGetMethod = unionType
+        var provider = UnionFacts.GetMemberProvider(unionType);
+        var tryGetMethod = (provider ?? unionType)
             .GetMembers("TryGetValue")
             .OfType<IMethodSymbol>()
             .FirstOrDefault(method =>
                 !method.IsStatic &&
                 method.Parameters.Length == 1 &&
                 method.Parameters[0].RefKind == RefKind.Out &&
-                (SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, memberType) ||
+                (SymbolEqualityComparer.Default.Equals(method.Parameters[0].GetByRefElementType(), memberType) ||
                  SymbolEqualityComparer.Default.Equals(
-                     method.Parameters[0].Type.OriginalDefinition ?? method.Parameters[0].Type,
+                     method.Parameters[0].GetByRefElementType().OriginalDefinition ?? method.Parameters[0].GetByRefElementType(),
                      memberType.OriginalDefinition ?? memberType)));
 
         if (tryGetMethod is null)
@@ -518,7 +536,9 @@ internal abstract class Generator
         ILGenerator.Emit(OpCodes.Stloc, unionLocal);
         ILGenerator.Emit(unionClrType.IsValueType ? OpCodes.Ldloca : OpCodes.Ldloc, unionLocal);
         ILGenerator.Emit(OpCodes.Ldloca, valueLocal);
-        ILGenerator.Emit(OpCodes.Call, GetMethodInfo(tryGetMethod));
+        if (provider is not null && unionClrType.IsValueType)
+            ILGenerator.Emit(OpCodes.Constrained, unionClrType);
+        ILGenerator.Emit(provider is not null ? OpCodes.Callvirt : OpCodes.Call, GetMethodInfo(tryGetMethod));
         ILGenerator.Emit(OpCodes.Brtrue, successLabel);
 
         var invalidCastCtor = typeof(InvalidCastException).GetConstructor(Type.EmptyTypes)

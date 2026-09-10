@@ -215,8 +215,10 @@ public sealed class CSharpUnionInteropTests
         }
     }
 
-    [Fact]
-    public void CSharpTypesFromLatestSdk_ImportUnionsAndClosedHierarchies()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CSharpTypesFromLatestSdk_ImportUnionsAndClosedHierarchies(bool includeHasValue)
     {
         if (!TryGetLatestDotNet11Sdk(out var sdkVersion))
             return;
@@ -259,6 +261,58 @@ public sealed class CSharpUnionInteropTests
                 namespace CSharpUnionFixture;
 
                 public union Foo(int, double?);
+
+                [Union]
+                public sealed class Provided : Provided.IUnionMembers
+                {
+                    private readonly object? _value;
+                    private Provided(object? value) => _value = value;
+                    public Provided(decimal value) => _value = value;
+                    public object Value => throw new Exception("Carrier Value must not be used");
+                    public bool HasValue => throw new Exception("Carrier HasValue must not be used");
+                    public bool TryGetValue(out int value) => throw new Exception("Carrier TryGetValue must not be used");
+                    object? IUnionMembers.Value => _value;
+                    public interface IUnionMembers
+                    {
+                        static Provided Create(int value) => new((object)value);
+                        static Provided Create(string? value) => new((object?)value);
+                        object? Value { get; }
+                    }
+                    public static int Check()
+                    {
+                        Provided value = 42;
+                        return value switch { int number => number, string => -1 };
+                    }
+                }
+
+                [Union]
+                public readonly struct ProvidedStruct<T> : ProvidedStruct<T>.IUnionMembers where T : struct
+                {
+                    private readonly object? _value;
+                    private ProvidedStruct(object? value) => _value = value;
+                    object? IUnionMembers.Value => _value;
+                    /*STRUCT_HAS_VALUE_IMPL*/
+                    bool IUnionMembers.TryGetValue(out T value)
+                    {
+                        value = _value is T item ? item : default;
+                        return _value is T;
+                    }
+                    public bool TryGetValue(out string value) => throw new Exception("Carrier-only access must be ignored");
+                    public interface IUnionMembers
+                    {
+                        static ProvidedStruct<T> Create(in T value) => new(value);
+                        static ProvidedStruct<T> Create(string? value) => new(value);
+                        object? Value { get; }
+                        /*STRUCT_HAS_VALUE_MEMBER*/
+                        bool TryGetValue(out T value);
+                    }
+                    public static int Check()
+                    {
+                        ProvidedStruct<T> value = default(T);
+                        return value switch { T => 7, string => -1 };
+                    }
+                }
+
 
                 public closed record GenericEvent<T>;
                 public sealed record GenericCreated<T>(T Value) : GenericEvent<T>;
@@ -329,7 +383,8 @@ public sealed class CSharpUnionInteropTests
                         return false;
                     }
                 }
-                """);
+                """.Replace("/*STRUCT_HAS_VALUE_IMPL*/", includeHasValue ? "bool IUnionMembers.HasValue => _value is not null;" : "")
+                   .Replace("/*STRUCT_HAS_VALUE_MEMBER*/", includeHasValue ? "bool HasValue { get; }" : ""));
 
             var build = RunDotnet(["build", "/property:WarningLevel=0", "-v:minimal"], directory);
             Assert.True(build.ExitCode == 0, build.Output);
@@ -414,6 +469,61 @@ public sealed class CSharpUnionInteropTests
                         loadContext.Unload();
                     }
                 }
+            }
+
+            var provided = Assert.IsAssignableFrom<IUnionSymbol>(compilation.GetTypeByMetadataName("CSharpUnionFixture.Provided"));
+            Assert.Equal(new[] { SpecialType.System_Int32, SpecialType.System_String }, provided.MemberTypes.Select(type => type.SpecialType));
+            Assert.True(provided.ContentMayBeNull);
+            Assert.False(compilation.ClassifyConversion(provided, compilation.GetSpecialType(SpecialType.System_Int32)).Exists);
+            Assert.False(compilation.ClassifyConversion(compilation.GetSpecialType(SpecialType.System_Decimal), provided).IsImplicit);
+            var providerTree = SyntaxTree.ParseText("""
+                import CSharpUnionFixture.*
+                public class ProviderEvaluator {
+                    public static func FromClass(value: int) -> Provided { return value }
+                    public static func Extract(value: ProvidedStruct<int>) -> int { return (int)value }
+                    public static func FromStruct(value: int) -> ProvidedStruct<int> { return value }
+                    public static func FromClassText(value: string?) -> Provided { return value }
+                    public static func FromStructText(value: string?) -> ProvidedStruct<int> { return value }
+                    public static func ClassValue(value: Provided) -> int {
+                        return match value { int n => n string => 2 null => 3 }
+                    }
+                    public static func StructValue(value: ProvidedStruct<int>) -> int {
+                        return match value { int n => n string => 2 null => 3 }
+                    }
+                }
+                """);
+            var providerConsumer = Compilation.Create("ProviderConsumer", [providerTree],
+                [.. net11References, MetadataReference.CreateFromFile(referencePath)],
+                new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using (var emitted = new MemoryStream())
+            {
+                var emit = providerConsumer.Emit(emitted);
+                Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+                emitted.Position = 0;
+                var context = new System.Runtime.Loader.AssemblyLoadContext("provider-interop", isCollectible: true);
+                try
+                {
+                    var fixture = context.LoadFromAssemblyPath(referencePath);
+                    var evaluator = context.LoadFromStream(emitted).GetType("ProviderEvaluator")!;
+                    var classValue = evaluator.GetMethod("FromClass")!.Invoke(null, [42]);
+                    Assert.Equal(42, evaluator.GetMethod("ClassValue")!.Invoke(null, [classValue]));
+                    Assert.Equal(3, evaluator.GetMethod("ClassValue")!.Invoke(null, [null]));
+                    var structValue = evaluator.GetMethod("FromStruct")!.Invoke(null, [7]);
+                    Assert.Equal(7, evaluator.GetMethod("StructValue")!.Invoke(null, [structValue]));
+                    Assert.Equal(7, evaluator.GetMethod("Extract")!.Invoke(null, [structValue]));
+                    var structType = fixture.GetType("CSharpUnionFixture.ProvidedStruct`1")!.MakeGenericType(typeof(int));
+                    Assert.Equal(3, evaluator.GetMethod("StructValue")!.Invoke(null, [Activator.CreateInstance(structType)]));
+                    foreach (var (text, expected) in new (string?, int)[] { ("text", 2), (null, 3) })
+                    {
+                        var fromClass = evaluator.GetMethod("FromClassText")!.Invoke(null, [text]);
+                        Assert.Equal(expected, evaluator.GetMethod("ClassValue")!.Invoke(null, [fromClass]));
+                        var fromStruct = evaluator.GetMethod("FromStructText")!.Invoke(null, [text]);
+                        Assert.Equal(expected, evaluator.GetMethod("StructValue")!.Invoke(null, [fromStruct]));
+                    }
+                    Assert.Equal(42, fixture.GetType("CSharpUnionFixture.Provided")!.GetMethod("Check")!.Invoke(null, null));
+                    Assert.Equal(7, structType.GetMethod("Check")!.Invoke(null, null));
+                }
+                finally { context.Unload(); }
             }
 
             var foo = fixtureNamespace.GetMembers("Foo").OfType<IUnionSymbol>().Single();

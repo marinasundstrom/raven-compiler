@@ -280,6 +280,10 @@ internal sealed partial class Lowerer
         IUnionSymbol unionType,
         ITypeSymbol targetType)
     {
+        // Provider patterns select their interface accessors during emission.
+        if (lookupType is INamedTypeSymbol namedProvider && UnionFacts.GetMemberProvider(namedProvider) is not null)
+            return null;
+
         var targetCaseType = targetType.GetNonNullableType();
         var targetUnion = (INamedTypeSymbol)UnwrapAlias((INamedTypeSymbol)unionType);
         var targetUnionCase = targetType.TryGetUnionCase();

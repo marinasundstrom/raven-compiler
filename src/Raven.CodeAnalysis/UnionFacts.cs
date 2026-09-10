@@ -9,6 +9,19 @@ namespace Raven.CodeAnalysis;
 
 internal static class UnionFacts
 {
+    public static INamedTypeSymbol? GetMemberProvider(INamedTypeSymbol type)
+        => type.GetMembers("IUnionMembers").OfType<INamedTypeSymbol>()
+            .FirstOrDefault(member => member.TypeKind == TypeKind.Interface &&
+                member.DeclaredAccessibility == Accessibility.Public && member.Arity == 0);
+
+    public static ImmutableArray<IMethodSymbol> GetProviderFactories(INamedTypeSymbol type)
+        => GetMemberProvider(type)?.GetMembers("Create").OfType<IMethodSymbol>()
+            .Where(method => method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
+                method.TypeParameters.IsDefaultOrEmpty && method.Parameters.Length == 1 &&
+                method.Parameters[0].RefKind is RefKind.None or RefKind.In &&
+                SymbolEqualityComparer.Default.Equals(method.ReturnType, type))
+            .ToImmutableArray() ?? ImmutableArray<IMethodSymbol>.Empty;
+
     private const char CaseMetadataSeparator = '_';
 
     public static bool IsUnionType(ITypeSymbol? type)

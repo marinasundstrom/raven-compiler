@@ -148,7 +148,7 @@ internal partial class PENamedTypeSymbol : PESymbol, INamedTypeSymbol
             parentUnion = associatedUnion;
         }
 
-        if (parentUnion is not null)
+        if (parentUnion is not null && !(typeInfo.IsInterface && name == "IUnionMembers"))
         {
             var caseSymbol = new PEUnionCaseSymbol(
                 reflectionTypeLoader,
@@ -183,6 +183,21 @@ internal partial class PENamedTypeSymbol : PESymbol, INamedTypeSymbol
                 return false;
             }
 
+            var provider = typeInfo.DeclaredNestedTypes.FirstOrDefault(type =>
+                type.IsNestedPublic && type.IsInterface && type.Name == "IUnionMembers");
+            if (provider is not null)
+            {
+                return typeInfo.ImplementedInterfaces.Any(implemented =>
+                    (implemented.IsGenericType ? implemented.GetGenericTypeDefinition() : implemented) == provider.AsType()) &&
+                    provider.DeclaredMethods.Any(method => method.Name == "Create" &&
+                    method.IsStatic && method.IsPublic && !method.IsGenericMethod &&
+                    method.GetParameters() is [var parameter] && IsUnionConstructorParameter(parameter) &&
+                    IsProviderFactoryReturnType(method.ReturnType, typeInfo.AsType())) &&
+                    provider.DeclaredProperties.Any(property => property.Name == "Value" &&
+                        property.GetMethod is { IsPublic: true, IsStatic: false } && property.GetIndexParameters().Length == 0 &&
+                        IsObjectType(property.PropertyType));
+            }
+
             if (!typeInfo.DeclaredConstructors.Any(static constructor =>
                     constructor.IsPublic &&
                     !constructor.IsStatic &&
@@ -202,6 +217,18 @@ internal partial class PENamedTypeSymbol : PESymbol, INamedTypeSymbol
         {
             return false;
         }
+    }
+
+    private static bool IsProviderFactoryReturnType(Type returnType, Type carrier)
+    {
+        if (!carrier.IsGenericType)
+            return returnType == carrier;
+        if (!returnType.IsGenericType || returnType.GetGenericTypeDefinition() != carrier.GetGenericTypeDefinition())
+            return false;
+
+        return returnType.GetGenericArguments().Zip(carrier.GetGenericArguments()).All(pair =>
+            pair.First == pair.Second || pair.First.IsGenericParameter && pair.Second.IsGenericParameter &&
+            pair.First.GenericParameterPosition == pair.Second.GenericParameterPosition);
     }
 
     private static bool IsObjectType(Type type)

@@ -74,6 +74,7 @@ records native closed-class metadata, standard-union JSON alignment, preserved
 .NET 10 targeting, and the intentional closed-interface difference. It now also records a completed clean RC 1 baseline (5,457 executions),
 isolated runtime suite (861 executions), standalone/project sample runs, the
 cross-target matrix, and Release sample IL verification. The full project build
-has one MAUI workload blocker. Provider-based C# unions and constructed generic
-closed-family matching remain documented interoperability gaps; the passing
+has one MAUI platform-toolchain blocker (Xcode 26.6 is required). Subsequent
+slices fix provider-based C# unions and ordinary constructed generic closed-family
+matching, with focused metadata and reloaded-runtime regressions; the passing
 gates do not establish universal C#/.NET 11 compatibility or bootstrap readiness.

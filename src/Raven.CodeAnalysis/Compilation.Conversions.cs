@@ -242,6 +242,20 @@ public partial class Compilation
             return Conversion.None;
         }
 
+        if (destinationUnion is INamedTypeSymbol providerUnion &&
+            UnionFacts.GetMemberProvider(providerUnion) is not null &&
+            (source.TypeKind != TypeKind.Null || providerUnion.IsValueType))
+        {
+            var factories = UnionFacts.GetProviderFactories(providerUnion);
+            var exact = factories.Where(factory => SymbolEqualityComparer.Default.Equals(
+                factory.Parameters[0].GetByRefElementType(), source)).ToArray();
+            var applicable = exact.Length > 0 ? exact : factories.Where(factory =>
+                ClassifyConversion(source, factory.Parameters[0].GetByRefElementType(), includeUserDefined: false)
+                    is { Exists: true, IsImplicit: true }).ToArray();
+            if (applicable.Length == 1)
+                return Finalize(new Conversion(isImplicit: true, isDiscriminatedUnion: true, methodSymbol: applicable[0]));
+        }
+
         if (source.TypeKind != TypeKind.Null &&
             destinationUnion is not null &&
             (sourceUnionCase is null || sourceUnionForCase is null))
@@ -1469,6 +1483,9 @@ public partial class Compilation
         if (destination is not INamedTypeSymbol destinationNamed)
             return null;
 
+        if (UnionFacts.GetMemberProvider(destinationNamed) is not null)
+            return null;
+
         var sourceCase = source.TryGetUnionCase();
         var sourceDefinition = source.OriginalDefinition ?? source;
         var sourceCaseDefinition = (sourceCase as ITypeSymbol)?.OriginalDefinition ?? sourceCase as ITypeSymbol;
@@ -1556,19 +1573,20 @@ public partial class Compilation
 
     private static IMethodSymbol? FindUnionTryGetValueMethod(INamedTypeSymbol unionType, ITypeSymbol memberType)
     {
-        foreach (var method in unionType.GetMembers("TryGetValue").OfType<IMethodSymbol>())
+        foreach (var method in (UnionFacts.GetMemberProvider(unionType) ?? unionType).GetMembers("TryGetValue").OfType<IMethodSymbol>())
         {
-            if (method.IsStatic || method.Parameters.Length != 1)
+            if (method.IsStatic || method.DeclaredAccessibility != Accessibility.Public ||
+                method.ReturnType.SpecialType != SpecialType.System_Boolean || method.Parameters.Length != 1)
                 continue;
 
             var parameter = method.Parameters[0];
             if (parameter.RefKind != RefKind.Out)
                 continue;
 
-            if (SymbolEqualityComparer.Default.Equals(parameter.Type, memberType))
+            if (SymbolEqualityComparer.Default.Equals(parameter.GetByRefElementType(), memberType))
                 return method;
 
-            var parameterDefinition = parameter.Type.OriginalDefinition ?? parameter.Type;
+            var parameterDefinition = parameter.GetByRefElementType().OriginalDefinition ?? parameter.GetByRefElementType();
             var memberDefinition = memberType.OriginalDefinition ?? memberType;
             if (SymbolEqualityComparer.Default.Equals(parameterDefinition, memberDefinition))
                 return method;

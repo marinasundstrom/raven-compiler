@@ -117,6 +117,9 @@ internal sealed class PEUnionSymbol : PENamedTypeSymbol, IUnionSymbol
             if (_cases is not null)
                 return _cases.Value;
 
+            if (UnionFacts.GetMemberProvider(this) is not null)
+                return (_cases = ImmutableArray<IUnionCaseTypeSymbol>.Empty).Value;
+
             var cases = GetDeclaredCaseTypesFromRavenMetadata();
 
             if (cases.IsDefaultOrEmpty)
@@ -287,6 +290,13 @@ internal sealed class PEUnionSymbol : PENamedTypeSymbol, IUnionSymbol
     private ImmutableArray<ITypeSymbol> GetRuntimeUnionMemberTypes()
     {
         var constructorTypes = ImmutableArray.CreateBuilder<ITypeSymbol>();
+
+        if (UnionFacts.GetMemberProvider(this) is not null)
+        {
+            foreach (var factory in UnionFacts.GetProviderFactories(this))
+                AddMemberType(constructorTypes, factory.Parameters[0].GetByRefElementType(), ref _contentMayBeNull);
+            return constructorTypes.ToImmutable();
+        }
 
         foreach (var constructor in Constructors)
         {

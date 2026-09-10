@@ -310,6 +310,18 @@ internal class ReflectionTypeLoader(Compilation compilation)
         if (_cache.TryGetValue(type, out var cached))
             return (ITypeParameterSymbol)cached;
 
+        // CLR nested types repeat the enclosing type's parameters. Canonicalize
+        // those inherited slots to their declaring owner before substitution.
+        if (type.DeclaringType?.DeclaringType is { } enclosingType)
+        {
+            var enclosingArguments = enclosingType.GetGenericArguments();
+            if (type.GenericParameterPosition < enclosingArguments.Length &&
+                ResolveType(enclosingArguments[type.GenericParameterPosition]) is ITypeParameterSymbol inherited)
+            {
+                return (ITypeParameterSymbol)_cache.GetOrAdd(type, inherited);
+            }
+        }
+
         var symbol = new PETypeParameterSymbol(
             type,
             declaringType,

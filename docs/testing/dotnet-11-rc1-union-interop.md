@@ -100,8 +100,8 @@ classification, closed-class round-trips, and malformed-body rejection. Both
 modes pass in `AspNetCoreUnionInteropTests`; generated mode also checks that RDG
 produced source without fallback diagnostics. OpenAPI checks pass in both modes
 and verify boolean/string alternatives, structural object-case schemas, and
-closed-class discriminator mappings. SignalR and Blazor remain follow-ups. Dedicated qualification below found a gap in C# `IUnionMembers` providers and
-identified the now-fixed constructed generic base-type defect. Universal interoperability is not
+closed-class discriminator mappings. SignalR and Blazor remain follow-ups. Dedicated qualification below identified and led to fixes for C# `IUnionMembers`
+providers and constructed generic base types. Universal interoperability is not
 yet established.
 
 ### Completed RC 1 release-gate pass
@@ -211,22 +211,25 @@ public sealed class Provided : Provided.IUnionMembers
 }
 ```
 
-**This provider shape is not yet interoperable with Raven's union semantics.**
-The RC 1 probe compiled successfully, but Raven imported `Provided` as an ordinary
-class, not an `IUnionSymbol`. The public decimal constructor intentionally is not
-a member of the C# union: the provider's `Create` methods define its int/string
-contents. Raven's current shape recognizer requires a public carrier `Value`
-property and public constructors; its member discovery, conversion selection,
-and pattern emission also assume the carrier surface. Merely relaxing the
-recognizer would select the wrong cases or emit invalid calls.
+This provider shape is now imported and consumed as a union. Its interface
+factories define the int/string cases; the extra public decimal constructor is
+ignored for union conversion. The nested interface remains an ordinary interface
+symbol, not a union case. Generic provider interfaces reuse the enclosing type's
+parameters so nullable contents and constructed factory signatures agree.
 
-A complete implementation must select the provider consistently for factory
-conversion, `Value`, optional `HasValue`, and optional `TryGetValue`, including
-explicit interface implementation, structs, generics, nullable contents, and
-by-reference factory arguments. The regression should require the same observed
-result from C# and Raven; the current incorrect import is not a contract to
-preserve. Ordinary constructor-based C# unions remain covered by the passing
-interop tests above.
+The runtime regression compiles the fixtures with the real RC 1 C# compiler,
+then emits and reloads a Raven consumer. It checks class and generic struct
+factories, `in` arguments, explicit interface accessors, nullable string
+contents, default struct values, and ignored carrier-only members that throw if
+called. Interface `HasValue` and `TryGetValue` are independently optional:
+type patterns use the matching provider extraction method when available,
+null patterns use its `HasValue`, and missing accessors fall back to its `Value`.
+Raven's explicit extraction conversion also uses the provider interface.
+
+The focused union/runtime/completion filter passes 260 checks, including provider
+variants with and without `HasValue`. Ordinary constructor-based unions remain
+covered. No new Raven syntax or TextMate rule is needed: symbol import and
+existing semantic APIs expose the provider contract to language services.
 
 ## References
 

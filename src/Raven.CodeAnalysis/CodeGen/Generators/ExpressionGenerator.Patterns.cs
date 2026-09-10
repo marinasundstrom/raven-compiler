@@ -99,6 +99,11 @@ internal partial class ExpressionGenerator
     {
         scope ??= this;
 
+        if (inputType is INamedTypeSymbol providerUnion && providerUnion.TryGetUnion() is not null &&
+            UnionFacts.GetMemberProvider(providerUnion) is { } provider &&
+            EmitProviderPattern(pattern, providerUnion, provider, scope, scrutineeLocal2))
+            return;
+
         static bool TypesMatch(ITypeSymbol? left, ITypeSymbol? right)
         {
             if (left is null || right is null)

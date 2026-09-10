@@ -143,6 +143,15 @@ additional variants when constructors are present. Nullable active contents are
 derived from nullable constructor parameter types, not from `Value` being
 `object?`.
 
+A C# union can instead delegate its contract to a directly nested public
+`IUnionMembers` interface that the carrier implements. Its public static
+one-parameter `Create` methods define the variants and return the carrier;
+by-value and `in` parameters are supported. Raven calls these factories for
+union conversions and uses the interface's `Value`, optional `HasValue`, and
+optional `TryGetValue` members for patterns. Carrier members absent from the
+provider interface do not participate in the union contract. Nullable contents
+come from factory parameter types. The provider interface is not a union case.
+
 Positional case payloads use stable metadata names even though ordinary Raven
 symbol display preserves the unnamed source form. A single unnamed payload is
 emitted as constructor parameter `value` and property `Value`; multiple
