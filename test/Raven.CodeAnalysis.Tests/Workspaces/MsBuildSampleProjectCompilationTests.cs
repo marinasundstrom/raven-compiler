@@ -5,6 +5,8 @@ using System.Xml.Linq;
 
 using Mono.Cecil;
 
+using Raven.CodeAnalysis.Testing;
+
 using Xunit.Abstractions;
 
 namespace Raven.CodeAnalysis.Tests.Workspaces;
@@ -260,48 +262,30 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
         }
     }
 
-    [Fact]
-    public void SampleProjects_CompileThroughRvnCli()
+    public static IEnumerable<object[]> SampleProjects()
     {
         var repoRoot = GetRepositoryRoot();
-        var projectsRoot = Path.Combine(repoRoot, "samples", "projects");
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
-        var projectPaths = Directory
-            .EnumerateFiles(projectsRoot, "*.rvnproj", SearchOption.AllDirectories)
+        return Directory.EnumerateFiles(Path.Combine(repoRoot, "samples", "projects"), "*.rvnproj", SearchOption.AllDirectories)
             .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .Select(path => new object[] { Path.GetRelativePath(repoRoot, path) });
+    }
 
-        Assert.NotEmpty(projectPaths);
-
-        var outputRoot = CreateTempDirectory();
+    [Theory]
+    [MemberData(nameof(SampleProjects))]
+    public void SampleProject_CompilesThroughCompilerDriver(string relativeProjectPath)
+    {
+        var repoRoot = GetRepositoryRoot();
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
+        var outputDirectory = CreateTempDirectory();
         try
         {
-            var failures = new List<string>();
-            foreach (var projectPath in projectPaths)
-            {
-                var relativeProjectPath = Path.GetRelativePath(repoRoot, projectPath);
-                var projectOutputDirectory = Path.Combine(
-                    outputRoot,
-                    Path.ChangeExtension(relativeProjectPath, null) ?? Path.GetFileNameWithoutExtension(projectPath));
-
-                Directory.CreateDirectory(projectOutputDirectory);
-
-                var result = RunCompiler(repoRoot, compilerDllPath, projectPath, projectOutputDirectory);
-                output.WriteLine($"[{relativeProjectPath}] exit={result.ExitCode}");
-                if (!string.IsNullOrWhiteSpace(result.StdOut))
-                    output.WriteLine(result.StdOut);
-                if (!string.IsNullOrWhiteSpace(result.StdErr))
-                    output.WriteLine(result.StdErr);
-
-                if (result.ExitCode != 0)
-                    failures.Add($"{relativeProjectPath}\nstdout:\n{result.StdOut}\nstderr:\n{result.StdErr}");
-            }
-
-            Assert.True(failures.Count == 0, string.Join("\n\n", failures));
+            var result = RunCompiler(repoRoot, compilerDllPath, Path.Combine(repoRoot, relativeProjectPath), outputDirectory);
+            Assert.True(result.ExitCode == 0,
+                $"{relativeProjectPath}\nstdout:\n{result.StdOut}\nstderr:\n{result.StdErr}");
         }
         finally
         {
-            DeleteDirectoryIfExists(outputRoot);
+            DeleteDirectoryIfExists(outputDirectory);
         }
     }
 
@@ -410,7 +394,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_BuildsThroughDotnetBuild()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -509,7 +493,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenSdk_RecompilesDeclaredUnionWhenSwitchingFromNet11ToNet10()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net11.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         EnsureRavenCoreBuilt(repoRoot, "net11.0");
         EnsureRavenCoreBuilt(repoRoot, "net10.0");
         var projectRoot = CreateTempDirectory();
@@ -646,7 +630,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_RebuildsWhenCompilerToolchainDependencyChanges()
     {
         var repoRoot = GetRepositoryRoot();
-        var builtCompilerPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var builtCompilerPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -704,7 +688,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_RebuildsWhenCompilerToolchainPathChanges()
     {
         var repoRoot = GetRepositoryRoot();
-        var builtCompilerPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var builtCompilerPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -760,7 +744,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenClassLibrary_DotnetPackIncludesDocumentationSidecars()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -825,7 +809,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_ForwardsConditionallyEvaluatedExternalConstantsToCompiler()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -890,7 +874,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_ExternalConstantOverridesTakePrecedenceOverProjectItems()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -958,7 +942,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_BuildsExplicitCompileItems_WhenDefaultItemsAreDisabled()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -1010,7 +994,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_UsesActiveConfigurationAndInnerTargetFramework()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -1068,7 +1052,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_CompileMacro_DiscoversRuntimeDependencyClosureFromOutput()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -1183,7 +1167,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_QuoteMacro_UsesExplicitCodeAnalysisReferenceWithGeneralDependencyClosure()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var codeAnalysisPath = Path.Combine(
             Path.GetDirectoryName(compilerDllPath)!,
             "Raven.CodeAnalysis.dll");
@@ -1260,7 +1244,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_ReferencedQuoteMacro_BuildsFreshThroughCompilerDriver()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -1337,7 +1321,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_BuildsSameProjectMacroWithoutMacroProjectItem()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var projectRoot = CreateTempDirectory();
         try
         {
@@ -1369,7 +1353,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
 
                     func Expand(context: TokenTreeMacroContext) -> FreestandingMacroExpansionResult {
                         FreestandingMacroExpansionResult {
-                            Expression = quote!{ 42 }
+                            Expression = Raven.CodeAnalysis.Syntax.SyntaxFactory.ParseExpression("42")
                         }
                     }
                 }
@@ -1405,7 +1389,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_BuildsThroughDotnetBuild_WithRavenCoreRuntimeDependency()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         EnsureRavenCoreBuilt(repoRoot, "net10.0");
         var projectRoot = CreateTempDirectory();
         try
@@ -1471,7 +1455,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenCoreProject_RebuildsWithoutReferencingPreviousOutput()
     {
         var repoRoot = GetRepositoryRoot();
-        _ = EnsureCompilerBuilt(repoRoot, "net10.0");
+        _ = EnsureCompilerBuilt(repoRoot);
         EnsureRavenCoreBuilt(repoRoot, "net10.0");
         var ravenCoreProjectPath = Path.Combine(repoRoot, "src", "Raven.Core", "Raven.Core.rvnproj");
 
@@ -1492,7 +1476,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void CSharpProject_CanReferenceRavenProjectThroughProjectReference()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var root = CreateTempDirectory();
         try
         {
@@ -1561,7 +1545,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_GlobalLanguageTargetsDoNotFlowToCSharpProjectReferences()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var root = CreateTempDirectory();
         try
         {
@@ -1625,7 +1609,7 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
     public void RavenProject_PublishesReferencedRavenProjectWithoutDuplicateRuntimeDependency()
     {
         var repoRoot = GetRepositoryRoot();
-        var compilerDllPath = EnsureCompilerBuilt(repoRoot, "net10.0");
+        var compilerDllPath = EnsureCompilerBuilt(repoRoot);
         var root = CreateTempDirectory();
         try
         {
@@ -1711,8 +1695,9 @@ public sealed class MsBuildSampleProjectCompilationTests(ITestOutputHelper outpu
         }
     }
 
-    private static string EnsureCompilerBuilt(string repoRoot, string targetFramework = "net11.0")
+    private static string EnsureCompilerBuilt(string repoRoot)
     {
+        const string targetFramework = TestTargetFramework.Default;
         var compilerDllPath = Path.Combine(repoRoot, "src", "Raven.Compiler", "bin", "Debug", targetFramework, "rvnc.dll");
         if (!File.Exists(compilerDllPath))
         {

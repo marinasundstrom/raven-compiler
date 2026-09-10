@@ -17,30 +17,17 @@ build_additional_isolated_names() {
     "ProjectDocumentationEmissionTests" \
     "ProjectFileTargetFrameworkAttributeTests" \
     "RavenProjectOutputDeterminismTests" \
+    "RavenCliFileRunTests" \
     "StaticFactoryMethod_UsesCanonicalSourceMethodForEmission" \
-    "OpenProject_RavenMacroProjectReference_WithObservableReplacement_EmitsExpandedSetter"
-}
-
-build_stale_runtime_exclusion_filter() {
-  local filter=""
-  local names=(
-    "MsBuildSampleProjectCompilationTests"
-    "ProjectFileNuGetReferenceTests"
-  )
-
-  for name in "${names[@]}"; do
-    filter+="&FullyQualifiedName!~.$name."
-  done
-
-  printf '%s' "$filter"
+    "OpenProject_CompilerPluginProjectReference_WithObservableReplacement_EmitsExpandedSetter"
 }
 
 # Runtime/emission-heavy tests are isolated in bounded test-host batches so
 # metadata reflection state cannot accumulate across the entire CodeGen suite.
 dotnet build "$PROJECT" -m:1 /property:WarningLevel=0 --disable-build-servers
 
-test_args=(-m:1 --no-build /property:WarningLevel=0 --blame-hang-timeout 300s --blame-hang-dump-type none)
-runtime_exclusions="&FullyQualifiedName!~CodeGen.Development$(build_stale_runtime_exclusion_filter)"
+test_args=(-m:1 --no-build /property:WarningLevel=0 --blame-hang-dump-type none)
+runtime_exclusions="&FullyQualifiedName!~CodeGen.Development"
 
 run_codegen_batches() {
   local class_batch=()
@@ -56,7 +43,7 @@ run_codegen_batches() {
       filter+="FullyQualifiedName~.$class_name."
     done
 
-    dotnet test "$PROJECT" "${test_args[@]}" --filter "($filter)$runtime_exclusions"
+    dotnet test "$PROJECT" "${test_args[@]}" --blame-hang-timeout 300s --filter "($filter)$runtime_exclusions"
   }
 
   while IFS= read -r class_name; do
@@ -74,9 +61,11 @@ run_codegen_batches() {
 
 run_codegen_batches
 
+# Project tests allow child builds up to 300 seconds; leave time for their
+# timeout handling to terminate children and report captured output.
 while IFS= read -r name; do
   [[ -z "$name" ]] && continue
-  dotnet test "$PROJECT" "${test_args[@]}" --filter "FullyQualifiedName~$name$runtime_exclusions"
+  dotnet test "$PROJECT" "${test_args[@]}" --blame-hang-timeout 600s --filter "FullyQualifiedName~$name$runtime_exclusions"
 done < <(build_additional_isolated_names)
 
-dotnet test "$PROJECT" "${test_args[@]}" --filter "FullyQualifiedName~Sample$runtime_exclusions"
+dotnet test "$PROJECT" "${test_args[@]}" --blame-hang-timeout 300s --filter "FullyQualifiedName~Sample&FullyQualifiedName!~.MsBuildSampleProjectCompilationTests.$runtime_exclusions"

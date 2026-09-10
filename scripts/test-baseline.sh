@@ -39,7 +39,7 @@ build_heavy_exclusion_filter() {
     "RavenCliFileRunTests"
     "RavenProjectOutputDeterminismTests"
     "StaticFactoryMethod_UsesCanonicalSourceMethodForEmission"
-    "OpenProject_RavenMacroProjectReference_WithObservableReplacement_EmitsExpandedSetter"
+    "OpenProject_CompilerPluginProjectReference_WithObservableReplacement_EmitsExpandedSetter"
   )
 
   for name in "${heavy_names[@]}"; do

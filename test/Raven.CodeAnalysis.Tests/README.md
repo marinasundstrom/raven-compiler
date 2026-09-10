@@ -171,13 +171,17 @@ Coverage includes missing `Main`, statement/namespace ordering, and library
 rejection through both semantic-model and compilation diagnostics, including
 queries made before diagnostic collection.
 
-Current explicit gaps:
+The isolated runtime runner has no stale-class quarantine. It includes project
+and CLI tests, with one compiler-driver case per sample project and a separate
+watchdog for project tests whose child processes have longer timeouts. MSBuild
+fixtures use the .NET 11 repository compiler host for both .NET 10 and .NET 11
+targets. NuGet/project loading remains in the baseline. The compiler-plugin project
+reference test that executes an expanded observable setter is selected by its
+current name in the isolated runtime tier.
 
-| Area | Gap | Preferred cleanup |
-|---|---|---|
-| Language server coverage | request/hover/workspace integration tests can run for minutes under the baseline runner | Split fast request/mapper/semantic presentation tests from workspace integration tests, then guard the latter separately before restoring them to a default gate |
-| Runtime CodeGen | stale runtime/reflection/emitted-shape classes are excluded from `scripts/test-runtime-isolated.sh`: `ProjectFileNuGetReferenceTests` | Reintroduce only focused runtime behavior checks; avoid emitted instruction/lowered shape assertions |
-| Project/CLI runtime | `MsBuildSampleProjectCompilationTests` can trip the runtime hang guard through `rvn`/MSBuild sample compilation | Replace with a bounded CLI smoke test or rely on `FORCE_REBUILD=1 samples/build.sh` for sample coverage |
+Project-backed language-server integration and performance coverage remain
+separate opt-in tiers, as listed above; they are not part of compiler test
+stabilization.
 
 Positional/tuple pattern coverage is active in the runtime tier. The restored
 `PositionalPatternCodeGenTests` execute tuple matches, immutable and mutable
