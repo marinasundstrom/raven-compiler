@@ -27,7 +27,6 @@ build_stale_runtime_exclusion_filter() {
     "AsyncPropagateCodeGenTests"
     "AsyncTryAwaitCodeGenTests"
     "FunctionExpressionCodeGenTests"
-    "GenericInvocationCodeGenTests"
     "AttachedMacroCodeGenTests"
     "MsBuildSampleProjectCompilationTests"
     "PdbSequencePointTests"

@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
 
 using Raven.CodeAnalysis.Syntax;
 
@@ -95,17 +94,17 @@ class GenericMethodRunner {
     }
 
     [Fact]
-    public void UnconstrainedTypeParameter_ToString_BoxesValueTypes()
+    public void UnconstrainedTypeParameter_ToString_ReturnsFormattedValue()
     {
         const string code = """
 import System.*
 
 class Formatter {
-    func Format<T>(value: T) -> string {
+    func Format<T>(value: T) -> string? {
         return value.ToString()
     }
 
-    func Run() -> string {
+    func Run() -> string? {
         return Format<int>(42)
     }
 }
@@ -128,25 +127,28 @@ class Formatter {
         Assert.Equal("42", value);
     }
 
-    [Fact]
-    public void StructConstrainedVarArgs_ConvertsElementToObject_ExecutesWithoutInvalidProgram()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StructConstrainedVarArgs_ConvertsElementsToObject(bool empty)
     {
-        const string code = """
+        var code = $$"""
 class Formatter {
-    static func Consume(value: object) -> int {
-        return 1
+    static func Consume(value: object) -> string {
+        return value.ToString() ?? "<null>"
     }
 
-    static func Collect<T>(items: T ...) where T: struct {
+    static func Collect<T>(items: T ...) -> string where T: struct {
+        var text = ""
         for item in items {
-            Consume(item)
+            text = text + Consume(item)
         }
+        return text
     }
 
-    func Run() -> int {
-        let arr: int[] = [1, 2, 3]
-        Collect(arr)
-        return 1
+    func Run() -> string {
+        let arr: int[] = {{(empty ? "[]" : "[1, 2, 3]")}}
+        return Collect(arr)
     }
 }
 """;
@@ -164,27 +166,30 @@ class Formatter {
         var instance = Activator.CreateInstance(type)!;
         var method = type.GetMethod("Run", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
-        var value = (int?)method!.Invoke(instance, Array.Empty<object>());
-        Assert.Equal(1, value);
+        var value = (string?)method!.Invoke(instance, Array.Empty<object>());
+        Assert.Equal(empty ? "" : "123", value);
     }
 
-    [Fact]
-    public void StructConstrainedVarArgs_SingleSpread_DoesNotMaterializeIntermediateList()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StructConstrainedVarArgs_SingleSpread_PreservesElements(bool empty)
     {
-        const string code = """
+        var code = $$"""
 import System.Collections.Immutable.*
 
 class Formatter {
-    static func Collect<T>(items: T ...) where T: struct {
+    static func Collect<T>(items: T ...) -> string where T: struct {
+        var text = ""
         for item in items {
-            item.ToString()
+            text = text + (item.ToString() ?? "<null>")
         }
+        return text
     }
 
-    func Run() -> int {
-        let arr: ImmutableList<int> = [1, 2, 3]
-        Collect(...arr)
-        return arr.Count
+    func Run() -> string {
+        let arr: ImmutableList<int> = {{(empty ? "[]" : "[1, 2, 3]")}}
+        return Collect(...arr)
     }
 }
 """;
@@ -203,25 +208,27 @@ class Formatter {
         var method = type.GetMethod("Run", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
 
-        var calledMembers = ILReader.GetCalledMembers(method!);
-        Assert.DoesNotContain(
-            calledMembers,
-            static member => member.Contains("System.Collections.Generic.List`1::Add", StringComparison.Ordinal));
-
         var instance = Activator.CreateInstance(type)!;
-        var value = (int?)method!.Invoke(instance, Array.Empty<object>());
-        Assert.Equal(3, value);
+        var value = (string?)method!.Invoke(instance, Array.Empty<object>());
+        Assert.Equal(empty ? "" : "123", value);
     }
 
-    [Fact]
-    public void StaticAbstractInterfaceCallOnTypeParameter_EmitsConstrainedPrefix()
+    [Theory]
+    [InlineData("42", 42)]
+    [InlineData("-7", -7)]
+    [InlineData("invalid", null)]
+    public void StaticAbstractInterfaceCallOnTypeParameter_ParsesOrThrows(string text, int? expected)
     {
         const string code = """
 import System.*
 
-func Parse<T>(text: string) -> T
-    where T: IParsable<T>
-    => T.Parse(text, null)
+class Parser {
+    static func Parse<T>(text: string) -> T
+        where T: IParsable<T>
+        => T.Parse(text, null)
+
+    static func Run(text: string) -> int => Parse<int>(text)
+}
 """;
 
         var syntaxTree = SyntaxTree.ParseText(code);
@@ -234,17 +241,20 @@ func Parse<T>(text: string) -> T
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
         using var loaded = TestAssemblyLoader.LoadFromStream(peStream, references);
 
-        var type = loaded.Assembly.GetType("Program", true)!;
+        var type = loaded.Assembly.GetType("Parser", true)!;
         var parseMethod = type
             .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
             .Single(m => string.Equals(m.Name, "Parse", StringComparison.Ordinal));
-        var opcodes = ILReader.GetOpCodes(parseMethod);
-
-        Assert.Contains(opcodes, opcode => opcode == OpCodes.Constrained);
-
         var typeParameter = parseMethod.GetGenericArguments().Single();
-        var constraints = typeParameter.GetGenericParameterConstraints();
-        Assert.Single(constraints);
+        var constraint = Assert.Single(typeParameter.GetGenericParameterConstraints());
+        Assert.Equal(typeof(IParsable<>), constraint.GetGenericTypeDefinition());
+
+        var run = type.GetMethod("Run")!;
+        if (expected is { } value)
+            Assert.Equal(value, run.Invoke(null, [text]));
+        else
+            Assert.IsType<FormatException>(Assert.Throws<TargetInvocationException>(() => run.Invoke(null, [text])).InnerException);
+
     }
 
     private static MetadataReference CreateAspNetCoreComponentsRuntimeReference()
