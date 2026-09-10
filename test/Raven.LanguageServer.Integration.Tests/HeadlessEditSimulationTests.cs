@@ -330,7 +330,8 @@ public sealed class HeadlessEditSimulationTests : IDisposable
         await using var simulation = HeadlessEditSimulation.Create(
             _tempRoot,
             topLevelSource,
-            includeStableDocument: false);
+            includeStableDocument: false,
+            outputKind: OutputKind.ConsoleApplication);
 
         var initialHover = await simulation.RunHoverProbeAsync(
             new HeadlessHoverProbe("top-level local", "answer", ExpectedText: "answer", Occurrence: 2));
@@ -540,15 +541,17 @@ public sealed class HeadlessEditSimulationTests : IDisposable
         private HeadlessEditSimulation(
             string root,
             string mainText,
-            bool includeStableDocument)
+            bool includeStableDocument,
+            OutputKind outputKind)
         {
             Directory.CreateDirectory(root);
 
             var projectPath = Path.Combine(root, "App.rvnproj");
-            File.WriteAllText(projectPath, """
+            File.WriteAllText(projectPath, $$"""
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
+                    <OutputType>{{(outputKind == OutputKind.ConsoleApplication ? "Exe" : "Library")}}</OutputType>
                   </PropertyGroup>
                   <ItemGroup>
                     <Compile Include="src/**/*.rvn" />
@@ -590,8 +593,9 @@ public sealed class HeadlessEditSimulationTests : IDisposable
         public static HeadlessEditSimulation Create(
             string root,
             string mainText,
-            bool includeStableDocument = true)
-            => new(root, mainText, includeStableDocument);
+            bool includeStableDocument = true,
+            OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
+            => new(root, mainText, includeStableDocument, outputKind);
 
         public async Task<HeadlessEditSnapshot> CaptureSnapshotAsync()
         {
