@@ -104,9 +104,47 @@ closed-class discriminator mappings. SignalR and Blazor remain follow-ups. Dedic
 constructed generic closed-family matching. Universal interoperability is not
 yet established.
 
-Earlier project-wide release gates ran on Preview 7. Their results must not be
-relabeled as RC 1 results; the full baseline interrupted during SDK installation
-is not a completed gate.
+### Completed RC 1 release-gate pass
+
+The following runs completed on 2026-09-10/11 against clean revision
+`1e989cf84`, using SDK `11.0.100-rc.1.26425.128`. The source tree remained
+unchanged throughout the pass. These supersede the earlier Preview 7 evidence
+for the listed gates; the baseline interrupted during SDK installation remains
+an incomplete historical run.
+
+| Gate | RC 1 result |
+| --- | --- |
+| `scripts/test-baseline.sh` | 5,457 passing executions; zero failures or skips |
+| `scripts/test-runtime-isolated.sh` | 861 passing executions; zero failures or skips |
+| `FORCE_REBUILD=1 samples/build.sh -f net10.0` | 173 samples built; zero failures |
+| `samples/run.sh` | 172 samples ran; zero failures; reviewed interactive exclusion retained |
+| `scripts/build-project-samples.sh` | 70 projects passed; one environment-blocked MAUI host |
+| `scripts/run-project-samples.sh` | 38 passed, 13 reviewed build-only classifications, 20 non-executable projects; zero failures |
+| `scripts/test-target-framework-matrix.sh` | Core/Macros built for .NET 10 and .NET 11; all three representative applications built and ran |
+| `scripts/test-sample-il.sh` | Release Core verified on both targets, Macros verified on .NET 10; all seven representative assemblies verified and ran |
+
+The runtime suite includes all four new Minimal API/OpenAPI cases, covering
+runtime and generated request delegates separately. Execution totals count
+bounded test runs, not necessarily distinct test identities.
+
+The full project build cannot be called green: RC 1 reports NETSDK1147 for
+`wasm-tools-net10` on `macro-maui/host/MauiCounter.Host.csproj`. A separate
+Mac Catalyst-only probe also reports the missing `maccatalyst` workload.
+`dotnet workload list` for this SDK lists no installed workloads. No sample was
+removed or reclassified to hide the failure. Xcode remains 26.2, but this pass
+stopped at workload resolution, before rechecking the previous Xcode 26.6
+requirement. Restore the RC 1 workloads and rerun the complete host build before
+claiming MAUI qualification.
+
+Detailed generated sample reports are stored at
+`samples/output/net10.0/build-report.tsv`,
+`samples/projects/output/build-report.tsv`,
+`samples/projects/output/run-report.tsv`, and
+`artifacts/validation/sample-il/report.tsv`. The latter records each verified
+assembly, target framework, source, and coverage reason. Existing exclusions and
+IL-tool limitations remain as described in the
+[release gates](release-and-bootstrap-gates.md). No bootstrap artifact freeze,
+tag, or release publication was performed.
 
 ## Generic closed-hierarchy qualification
 
