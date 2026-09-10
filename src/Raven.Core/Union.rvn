@@ -3,6 +3,37 @@ namespace System
 import System.*
 import System.Text.Json.Serialization.*
 
+#if RAVEN_NATIVE_UNION_JSON
+/// Represents a value that can contain one of two alternative types.
+///
+/// @typeparam T1 The first alternative type.
+/// @typeparam T2 The second alternative type.
+public union Union<T1, T2>(T1 | T2)
+
+/// Represents a value that can contain one of three alternative types.
+///
+/// @typeparam T1 The first alternative type.
+/// @typeparam T2 The second alternative type.
+/// @typeparam T3 The third alternative type.
+public union Union<T1, T2, T3>(T1 | T2 | T3)
+
+/// Represents a value that can contain one of four alternative types.
+///
+/// @typeparam T1 The first alternative type.
+/// @typeparam T2 The second alternative type.
+/// @typeparam T3 The third alternative type.
+/// @typeparam T4 The fourth alternative type.
+public union Union<T1, T2, T3, T4>(T1 | T2 | T3 | T4)
+
+/// Represents a value that can contain one of five alternative types.
+///
+/// @typeparam T1 The first alternative type.
+/// @typeparam T2 The second alternative type.
+/// @typeparam T3 The third alternative type.
+/// @typeparam T4 The fourth alternative type.
+/// @typeparam T5 The fifth alternative type.
+public union Union<T1, T2, T3, T4, T5>(T1 | T2 | T3 | T4 | T5)
+#else
 /// Represents a value that can contain one of two alternative types.
 ///
 /// @typeparam T1 The first alternative type.
@@ -36,3 +67,4 @@ public union Union<T1, T2, T3, T4>(T1 | T2 | T3 | T4)
 /// @typeparam T5 The fifth alternative type.
 [JsonConverter(typeof(RavenParenthesizedUnionJsonConverterFactory))]
 public union Union<T1, T2, T3, T4, T5>(T1 | T2 | T3 | T4 | T5)
+#endif

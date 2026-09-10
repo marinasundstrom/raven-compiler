@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Standard `System.Union<...>` carriers now use native System.Text.Json union
+  serialization when targeting .NET 11. The .NET 10 asset keeps its existing
+  converter, JSON format, and case-selection behavior.
+
 - .NET 11 closed class hierarchies now emit the framework `IsClosedTypeAttribute`,
   enabling C# exhaustive switches and opt-in System.Text.Json polymorphism.
   Raven recognizes C# closed hierarchies and rejects external direct derivation.

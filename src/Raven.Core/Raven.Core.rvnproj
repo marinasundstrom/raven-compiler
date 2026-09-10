@@ -7,6 +7,7 @@
     <OutputType>Library</OutputType>
     <ImplicitImports>false</ImplicitImports>
     <Nullable>disable</Nullable>
+    <DefineConstants Condition="'$(TargetFramework)' == 'net11.0'">$(DefineConstants);RAVEN_NATIVE_UNION_JSON</DefineConstants>
     <RavenEmitCoreTypesOnly>true</RavenEmitCoreTypesOnly>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <GenerateXmlDocumentationFromMarkdownComments>true</GenerateXmlDocumentationFromMarkdownComments>

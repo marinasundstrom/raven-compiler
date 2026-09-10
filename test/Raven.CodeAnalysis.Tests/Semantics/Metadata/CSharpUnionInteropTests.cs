@@ -139,6 +139,40 @@ public sealed class CSharpUnionInteropTests
                 if (!error.TryGetValue(out RavenProduced.Result.Error<string> extractedError) || extractedError.Error != "bad")
                     return Fail("Generic companion case should preserve only its required generic parameter.");
 
+                var unionOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
+                };
+                foreach (var unionType in new[]
+                {
+                    typeof(System.Union<bool, string>),
+                    typeof(System.Union<bool, string, int>),
+                    typeof(System.Union<bool, string, int, double>),
+                    typeof(System.Union<bool, string, int, double, decimal>)
+                })
+                {
+                    if (unionOptions.GetTypeInfo(unionType).Kind != System.Text.Json.Serialization.Metadata.JsonTypeInfoKind.Union)
+                        return Fail("Standard unions should use the .NET 11 union contract: " + unionType);
+                }
+                var flag = System.Text.Json.JsonSerializer.Deserialize<System.Union<bool, string>>("true",
+                    System.Text.Json.JsonSerializerOptions.Web);
+                if (flag.Value is not true)
+                    return Fail("Standard bool/string unions should round-trip using web defaults.");
+                var generatedJson = System.Text.Json.JsonSerializer.Serialize(flag,
+                    typeof(System.Union<bool, string>), NativeUnionJsonContext.Default);
+                var generatedValue = (System.Union<bool, string>)System.Text.Json.JsonSerializer.Deserialize(
+                    generatedJson, typeof(System.Union<bool, string>), NativeUnionJsonContext.Default)!;
+                if (generatedJson != "true" || generatedValue.Value is not true)
+                    return Fail("Standard unions should work with System.Text.Json source generation.");
+                var unionJson = System.Text.Json.JsonSerializer.Serialize(
+                    new System.Union<Authorized, string>(new Authorized("id", 42m)), unionOptions);
+                if (unionJson.Contains("$type"))
+                    return Fail("Native union JSON should not add a discriminator: " + unionJson);
+                var unionRoundTrip = System.Text.Json.JsonSerializer.Deserialize<System.Union<Authorized, string>>(
+                    unionJson, unionOptions);
+                if (unionRoundTrip.Value is not Authorized { Amount: 42m, PaymentId: "id" })
+                    return Fail("Native union JSON should round-trip its object case.");
+
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions
                 {
                     InferClosedTypePolymorphism = true
@@ -161,6 +195,11 @@ public sealed class CSharpUnionInteropTests
                     return Fail("C# should match the Raven closed hierarchy.");
 
                 return 0;
+
+                [System.Text.Json.Serialization.JsonSerializable(typeof(System.Union<bool, string>))]
+                internal partial class NativeUnionJsonContext : System.Text.Json.Serialization.JsonSerializerContext
+                {
+                }
                 """);
 
             var build = RunDotnet(["build", "/property:WarningLevel=0", "-v:minimal"], directory);

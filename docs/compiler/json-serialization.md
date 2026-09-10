@@ -11,7 +11,9 @@ serialization policy is intentionally payload-first:
   payload type is known.
 
 This document describes the current converter contracts implemented in
-`src/Raven.Core`.
+`src/Raven.Core`. Standard `System.Union<...>` carriers use native union
+serialization in the .NET 11 asset and retain Raven's converter in the .NET 10
+asset. The target framework, not the compiler host, selects that behavior.
 
 The built-in carrier converters are not one shared union format. Each converter
 maps its carrier to the JSON shape that best matches the carrier's role:
@@ -115,7 +117,8 @@ lowercase `case`, `value`, and `data`; they are not produced through
 
 The type syntax `T1 | T2` lowers to Raven.Core's built-in
 `System.Union<T1, T2>` carrier. Arity-specific carriers exist for two through
-five member types and use `RavenParenthesizedUnionJsonConverterFactory`.
+five member types. On .NET 11 they use the framework's native union contract;
+on .NET 10 they use `RavenParenthesizedUnionJsonConverterFactory`.
 
 The same carrier is directly usable from C#:
 
@@ -140,6 +143,31 @@ can be any type, including primitives, arrays, and framework types. They do not
 have a closed set of generated case object types. The parenthesized union
 converter is therefore designed to serialize as plain JSON when the member can
 be inferred from the JSON token shape.
+
+### Native .NET 11 behavior
+
+The .NET 11 standard carriers expose `JsonTypeInfoKind.Union`. Serialization
+writes the active case's JSON directly, including object cases, without adding
+a union discriminator. Cases with distinct JSON token kinds can be read without
+a classifier; for example, `bool | string` works with web defaults.
+
+Cases sharing a JSON kind require explicit classification. In particular, web
+defaults permit reading numbers from JSON strings, so `int | string` is
+ambiguous on input. This follows the framework contract rather than Raven's
+legacy first-match policy. For nominal object unions, `[JsonUnion]` can select
+the framework's structural classifier when case property names distinguish the
+objects. See Microsoft's [union serialization guidance](https://devblogs.microsoft.com/dotnet/unions-and-closed-hierarchies-in-aspnetcore/).
+
+`Option<T>` and `Result<T, E>` retain their documented, type-specific converters;
+this change concerns the standard parenthesized union carriers. Explicit Raven
+converter attributes and registrations remain opt-in policies.
+
+### Legacy converter behavior
+
+The remaining subsections describe `RavenParenthesizedUnionJsonConverterFactory`,
+which remains the default for the .NET 10 standard carriers. Targeting .NET 10
+preserves the existing JSON format and case-selection behavior, including when
+the compiler runs on .NET 11.
 
 ### Empty Carrier
 
@@ -344,8 +372,8 @@ is selected, `System.Text.Json` serializes its elements normally, so recursive
 union elements use their own converter.
 
 Use this tagged converter only when the desired JSON contract is explicitly
-tagged. For plain JSON value-union behavior, use
-`RavenParenthesizedUnionJsonConverterFactory` with parenthesized unions.
+tagged. For plain JSON value-union behavior on .NET 11, use the native union contract.
+The .NET 10 fallback is `RavenParenthesizedUnionJsonConverterFactory`.
 
 Read behavior:
 
@@ -360,6 +388,7 @@ Read behavior:
 | --- | --- | --- | --- |
 | `Option<T>` | `OptionJsonConverter<T>` | Yes | `None` is `null`; `Some` is the payload |
 | `Result<T, E>` | `ResultJsonConverter<T, E>` | No | `{ "case": "Ok", "value": ... }` or `{ "case": "Error", "data": ... }` |
-| `T1 | T2` / `System.Union<...>` | `RavenParenthesizedUnionJsonConverter<TUnion>` | Yes | Object members get `$type`; arrays currently remain plain arrays |
+| `T1 | T2` / `System.Union<...>` targeting .NET 11 | Native System.Text.Json union converter | Yes | Active case JSON; ambiguous cases need classification |
+| `T1 | T2` / `System.Union<...>` targeting .NET 10 | `RavenParenthesizedUnionJsonConverter<TUnion>` | Yes | Object members get `$type`; arrays currently remain plain arrays |
 | `union Name(T1 | T2)` with `RavenParenthesizedUnionJsonConverterFactory` | `RavenParenthesizedUnionJsonConverter<TUnion>` | Yes | Object members get `$type`; arrays currently remain plain arrays |
 | Case-declaration union with `[RavenTaggedUnionJsonConverter]` | `RavenTaggedUnionJsonConverter<TUnion>` | No | Tagged discriminator; case payload properties are flattened |
