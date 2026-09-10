@@ -29,7 +29,6 @@ build_stale_runtime_exclusion_filter() {
     "AttachedMacroCodeGenTests"
     "MsBuildSampleProjectCompilationTests"
     "PdbSequencePointTests"
-    "PrimaryConstructorParameterCodeGenTests"
     "ProjectFileNuGetReferenceTests"
     "PropertyTests"
     "RuntimeAsyncCodeGenTests"

@@ -76,13 +76,15 @@ record struct Year private (Value: int) {
         Assert.True(constructor.IsPrivate);
     }
 
-    [Fact]
-    public void Emit_AsyncPrimaryConstructorClassMethod_ResolvesBodyParameterBuilder()
+    [Theory]
+    [InlineData(21, "ok:50")]
+    [InlineData(0, "error:Weight must be positive")]
+    [InlineData(-1, "error:Weight must be positive")]
+    public async Task Emit_AsyncPrimaryConstructorClassMethod_PreservesParametersAcrossSuspension(int weight, string expected)
     {
         const string source = """
 import System.*
 import System.Threading.Tasks.*
-import System.Threading.Tasks.Task.*
 
 union Result<T, E> {
     case Ok(value: T)
@@ -90,14 +92,22 @@ union Result<T, E> {
 }
 
 class ShipmentOrderService(private var pendingCount: int = 0) {
-    async func BuildQuote(weightKg: int) -> Task<Result<int, string>> {
-        await Delay(20)
+    async func BuildQuote(weightKg: int, gate: Task<int>) -> Task<Result<int, string>> {
+        let surcharge = await gate
 
         if weightKg > 0 {
-            return Ok(weightKg * 2)
+            return .Ok(weightKg * 2 + pendingCount + surcharge)
         }
 
-        return Error("Weight must be positive")
+        return .Error("Weight must be positive")
+    }
+
+    async func Run(weightKg: int, gate: Task<int>) -> Task<string> {
+        let quote = await BuildQuote(weightKg, gate)
+        return match quote {
+            .Ok(let value) => "ok:" + value.ToString()
+            .Error(let error) => "error:" + error
+        }
     }
 }
 """;
@@ -115,10 +125,19 @@ class ShipmentOrderService(private var pendingCount: int = 0) {
         peStream.Position = 0;
         using var loaded = TestAssemblyLoader.LoadFromStream(peStream, TestMetadataReferences.Default);
         var type = loaded.Assembly.GetType("ShipmentOrderService", throwOnError: true)!;
-        var instance = Activator.CreateInstance(type, new object[] { 0 })!;
-        var method = type.GetMethod("BuildQuote", new[] { typeof(int) })!;
-
-        var task = Assert.IsAssignableFrom<Task>(method.Invoke(instance, new object[] { 21 }));
-        task.GetAwaiter().GetResult();
+        var instance = Activator.CreateInstance(type, new object[] { 3 })!;
+        var method = type.GetMethod("Run")!;
+        var gate = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var task = Assert.IsAssignableFrom<Task<string>>(method.Invoke(instance, [weight, gate.Task]));
+        try
+        {
+            Assert.False(task.IsCompleted);
+            gate.SetResult(5);
+            Assert.Equal(expected, await task.WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            gate.TrySetCanceled();
+        }
     }
 }
