@@ -19,7 +19,7 @@ public class CollectionExpressionIncrementalSemanticTests : CompilationTestBase
         var workspace = RavenWorkspace.Create(targetFramework: TestMetadataReferences.TargetFramework);
         var projectId = workspace.AddProject(
             "collection-target-edit",
-            compilationOptions: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+            compilationOptions: new CompilationOptions(OutputKind.ConsoleApplication),
             targetFramework: TestMetadataReferences.TargetFramework);
         var project = workspace.CurrentSolution.GetProject(projectId)!;
 
