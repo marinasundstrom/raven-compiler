@@ -88,27 +88,16 @@ through `analyzers/dotnet`, which Raven's project system loads automatically.
 | Style | `RAV9036` | Default | Info | Prefer `loop` over `while true` for an unconditional loop. |
 | Style | `RAV1051` | Opt-in | Warning | Prefer a newline between declarations. |
 
-### Known `RAV9027` macro-fragment gap
+### Macro-fragment references
 
-`RAV9027` does not yet count a caller local as used when its only reference is
-inside an embedded Raven fragment reported by a macro. For example, `items` may
-currently receive an unused-local warning even though the Query macro binds and
-compiles its use correctly:
+The unused-variable analyzers count caller locals and parameters referenced by
+macro-reported Raven fragments. They resolve those references through the
+compiler's macro-fragment semantic model. This includes a local whose only use
+is inside a fragment, such as a JSON macro interpolation.
 
-```raven
-let items = [1, 2, 3, 4]
-let queryResult = query! {
-    from value in items
-    where value > 2
-    select value * 10
-}
-```
-
-This is an analyzer limitation, not a macro-expansion or fragment-binding
-error. Hover, completion, diagnostics, and semantic classification inside the
-reported fragments use the compiler's macro-fragment semantic model. The
-unused-local analyzer still needs to consume those semantic references before
-it can suppress `RAV9027` in this case.
+The macro must report its embedded Raven regions; arbitrary token text is not
+treated as a semantic reference. `UnusedLocalAnalyzerTests` covers a caller local
+read through a reported expression fragment.
 
 ## Choosing a policy
 

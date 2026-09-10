@@ -99,13 +99,12 @@ Sources of truth:
 | `FieldReference`/`PropertyReference`/`MethodReference` | `BoundMemberAccessExpression` | `MemberReferenceOperation` |
 | `FieldReference`/`PropertyReference`/`MethodReference` | `BoundPointerMemberAccessExpression` | `MemberReferenceOperation` |
 
-## Missing operation kinds or specialized nodes (no mapping yet)
+## Internal wrappers and fallback operations
 
-These bound nodes are not mapped to `OperationKind`/specialized operations in `OperationFactory` and currently default to `SimpleOperation` (or have no kind at all). These are the primary candidates for new operation kinds or new specialized operation nodes.
-
-| Bound node(s) | Suggested operation shape | Notes |
-| --- | --- | --- |
-| `BoundNullableValueExpression` | `INullableValueOperation` (new) | Internal wrapper candidate; currently unwrapped to operand. |
+Internal lowering wrappers do not require dedicated public operation kinds.
+The wrappers below are intentionally unwrapped by `OperationFactory`; they are
+not missing API mappings. Other fallback operations should be assessed against
+a concrete consumer scenario before extending the public API.
 
 Intentional internal wrappers (not exposed as dedicated operations):
 
