@@ -6,6 +6,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Semantic diagnostics now include parent binder scopes hidden by the top-level
+  executable binder, restoring the error for file-scope code in libraries.
+
 - Reading a by-reference parameter now loads the referenced value rather than
   its address. Writes and forwarded calls preserve the caller's storage, including
   generic swaps of value and reference types.

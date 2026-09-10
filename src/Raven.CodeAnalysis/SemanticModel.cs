@@ -765,7 +765,7 @@ public partial class SemanticModel
                     }
 
                     phaseStart = Stopwatch.GetTimestamp();
-                    foreach (var binderState in _binderCache.Values)
+                    foreach (var binderState in EnumerateDiagnosticBinders())
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         // Declaration and import-scope binders own diagnostics produced
@@ -1814,7 +1814,7 @@ public partial class SemanticModel
 
             void ClearCachedBinderDiagnostics(Text.TextSpan span)
             {
-                foreach (var binderState in _binderCache.Values)
+                foreach (var binderState in EnumerateDiagnosticBinders())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -1911,7 +1911,7 @@ public partial class SemanticModel
 
             void ClearCachedBinderDiagnostics(Text.TextSpan span)
             {
-                foreach (var binderState in _binderCache.Values)
+                foreach (var binderState in EnumerateDiagnosticBinders())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -1923,10 +1923,22 @@ public partial class SemanticModel
             }
         }
 
+        IEnumerable<Binder> EnumerateDiagnosticBinders()
+        {
+            // A top-level executable binder replaces its compilation-unit scope in
+            // the syntax cache. That scope still owns declaration diagnostics.
+            var seen = new HashSet<Binder>(ReferenceEqualityComparer.Instance);
+            foreach (var cachedBinder in _binderCache.Values)
+            {
+                for (var current = cachedBinder; current is not null && seen.Add(current); current = current.ParentBinder)
+                    yield return current;
+            }
+        }
+
         ImmutableArray<Diagnostic> CollectAllBinderDiagnostics(CancellationToken cancellationToken)
         {
             var builder = ImmutableArray.CreateBuilder<Diagnostic>();
-            foreach (var binderState in _binderCache.Values)
+            foreach (var binderState in EnumerateDiagnosticBinders())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 builder.AddRange(binderState.Diagnostics.AsEnumerable());
@@ -1956,7 +1968,7 @@ public partial class SemanticModel
             if (builders.Count == 0)
                 return new Dictionary<SyntaxNode, ImmutableArray<Diagnostic>>(ReferenceEqualityComparer.Instance);
 
-            foreach (var binderState in _binderCache.Values)
+            foreach (var binderState in EnumerateDiagnosticBinders())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 foreach (var diagnostic in binderState.Diagnostics.AsEnumerable())

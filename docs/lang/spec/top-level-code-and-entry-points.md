@@ -146,8 +146,8 @@ Files may start with executable statements that aren't enclosed in a function or
 type. This file-scope code forms the application's entry point and is translated
 into a synchronous `Program.Main` plus an async `Program.MainAsync` that returns
 `Task` or `Task<int>` depending on whether the script returns a value. Only
-console applications may include file-scope code, and
-it may appear in at most one file per compilation. When present, these
+console applications may include file-scope code (`RAV1012` is reported on the
+first executable statement otherwise), and it may appear in at most one file per compilation. When present, these
 statements execute in source order. Top-level type declarations are hoisted for
 binding, so helper types may appear anywhere in the file or its file-scoped
 namespace without changing the execution order of file-scope code.

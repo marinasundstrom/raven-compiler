@@ -8,13 +8,22 @@ namespace Raven.CodeAnalysis.Semantics.Tests;
 
 public class FileScopedCodeDiagnosticsTests
 {
-    [Fact(Skip = "Requires reference assemblies in this environment")]
-    public void Library_WithFileScopedCode_ProducesDiagnostic()
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("0", true)]
+    [InlineData("namespace Example;\n0", false)]
+    [InlineData("namespace Example;\n0", true)]
+    public void Library_WithFileScopedCode_ProducesDiagnostic(string source, bool queryBeforeDiagnostics)
     {
-        var tree = SyntaxTree.ParseText("0");
+        var tree = SyntaxTree.ParseText(source);
         var compilation = Compilation.Create("lib", [tree], TestMetadataReferences.Default, new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var diagnostics = compilation.GetDiagnostics();
-        Assert.Contains(diagnostics, d => d.Descriptor == CompilerDiagnostics.FileScopedCodeRequiresConsole);
+        var model = compilation.GetSemanticModel(tree);
+        if (queryBeforeDiagnostics)
+            model.GetTypeInfo(tree.GetRoot().DescendantNodes().OfType<LiteralExpressionSyntax>().Single());
+
+        var diagnostic = Assert.Single(model.GetDiagnostics().Where(d => d.Descriptor == CompilerDiagnostics.FileScopedCodeRequiresConsole));
+        Assert.Equal("0", tree.GetText().ToString(diagnostic.Location.SourceSpan));
+        Assert.Single(compilation.GetDiagnostics().Where(d => d.Descriptor == CompilerDiagnostics.FileScopedCodeRequiresConsole));
     }
 
     [Fact]
@@ -32,7 +41,7 @@ public class FileScopedCodeDiagnosticsTests
         Assert.Contains(diagnostics, d => d.Location.SourceTree == tree2);
     }
 
-    [Fact(Skip = "Requires reference assemblies in this environment")]
+    [Fact]
     public void FileScopedCode_CanAppearAfterTypeDeclaration()
     {
         var code = """
@@ -48,7 +57,7 @@ struct S {}
         Assert.DoesNotContain(diagnostics, d => d.Descriptor == CompilerDiagnostics.FileScopedCodeOutOfOrder);
     }
 
-    [Fact(Skip = "Requires reference assemblies in this environment")]
+    [Fact]
     public void FileScopedNamespace_AfterGlobalStatement_ProducesDiagnostic()
     {
         var code = """

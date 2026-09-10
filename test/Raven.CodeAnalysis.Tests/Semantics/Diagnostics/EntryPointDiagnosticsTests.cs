@@ -102,7 +102,7 @@ class Program {
         Assert.Equal(SpecialType.System_Array, argsType.BaseType.SpecialType);
     }
 
-    [Fact(Skip = "Requires reference assemblies in this environment")]
+    [Fact]
     public void ConsoleApp_WithoutMain_ProducesDiagnostic()
     {
         var tree = SyntaxTree.ParseText("");
