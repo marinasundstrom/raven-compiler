@@ -98,8 +98,9 @@ certify every ASP.NET Core integration. Minimal API HTTP checks now cover both r
 boolean/string, nullable and asynchronous union responses, structural object-case
 classification, closed-class round-trips, and malformed-body rejection. Both
 modes pass in `AspNetCoreUnionInteropTests`; generated mode also checks that RDG
-produced source without fallback diagnostics. OpenAPI, SignalR, and Blazor checks
-remain follow-ups. C# custom
+produced source without fallback diagnostics. OpenAPI checks pass in both modes
+and verify boolean/string alternatives, structural object-case schemas, and
+closed-class discriminator mappings. SignalR and Blazor remain follow-ups. C# custom
 `IUnionMembers` provider shapes and broader generic closed-family exhaustiveness
 also need dedicated qualification before claiming universal interoperability.
 

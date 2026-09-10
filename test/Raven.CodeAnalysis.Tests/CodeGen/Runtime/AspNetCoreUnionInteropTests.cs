@@ -12,6 +12,15 @@ public sealed class AspNetCoreUnionInteropTests
     [InlineData(false)]
     [InlineData(true)]
     public void RavenContracts_RoundTripThroughMinimalApis(bool generatedDelegates)
+        => RunScenario(generatedDelegates, openApi: false);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RavenContracts_PublishOpenApiSchemas(bool generatedDelegates)
+        => RunScenario(generatedDelegates, openApi: true);
+
+    private static void RunScenario(bool generatedDelegates, bool openApi)
     {
         var directory = Path.Combine(Path.GetTempPath(), $"raven-http-unions-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
@@ -35,10 +44,14 @@ public sealed class AspNetCoreUnionInteropTests
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="Models"><HintPath>Models.dll</HintPath></Reference>
+                    {{(openApi ? "<PackageReference Include=\"Microsoft.AspNetCore.OpenApi\" Version=\"11.0.0-rc.1.26425.128\" />" : "")}}
                   </ItemGroup>
                 </Project>
                 """);
-            File.WriteAllText(Path.Combine(directory, "Program.cs"), HostSource);
+            File.WriteAllText(Path.Combine(directory, "Program.cs"), HostSource
+                .Replace("/* OPENAPI_SERVICES */", openApi ? "builder.Services.AddOpenApi();" : "")
+                .Replace("/* OPENAPI_ROUTE */", openApi ? "app.MapOpenApi();" : "")
+                .Replace("/* OPENAPI_ASSERTIONS */", openApi ? OpenApiAssertions : ""));
             var build = RunDotnet(directory, "build", "/property:WarningLevel=0", "-v:minimal");
             Assert.DoesNotMatch(new Regex(@"\bRDG\d+\b"), build);
             if (generatedDelegates)
@@ -116,12 +129,14 @@ public sealed class AspNetCoreUnionInteropTests
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.InferClosedTypePolymorphism = true);
+        /* OPENAPI_SERVICES */
         await using var app = builder.Build();
         app.MapPost("/flag", (Flag flag) => flag);
         app.MapGet("/number", () => Task.FromResult(new NumberOrText(42)));
         app.MapGet("/optional", () => new Optional((int?)null));
         app.MapPost("/pet", (Pet pet) => TypedResults.Ok(pet));
         app.MapPost("/event", (PaymentEvent payment) => TypedResults.Ok(payment));
+        /* OPENAPI_ROUTE */
         await app.StartAsync();
         try
         {
@@ -136,6 +151,8 @@ public sealed class AspNetCoreUnionInteropTests
             using var invalid = await client.PostAsync("/flag", new StringContent("{}", Encoding.UTF8, "application/json"));
             if (invalid.StatusCode != HttpStatusCode.BadRequest) throw new Exception("Malformed union input should return 400.");
 
+            /* OPENAPI_ASSERTIONS */
+
             async Task RoundTrip(string route, string body)
             {
                 using var response = await client.PostAsync(route, new StringContent(body, Encoding.UTF8, "application/json"));
@@ -149,4 +166,38 @@ public sealed class AspNetCoreUnionInteropTests
             await app.StopAsync();
         }
         """";
+    private const string OpenApiAssertions = """
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json"));
+        var root = document.RootElement;
+        var flagSchema = RequestSchema("/flag");
+        var alternatives = flagSchema.GetProperty("anyOf").EnumerateArray().Select(Resolve).ToArray();
+        var kinds = alternatives.Select(schema => schema.GetProperty("type").GetString()).Order().ToArray();
+        if (!kinds.SequenceEqual(new[] { "boolean", "string" }) || flagSchema.TryGetProperty("discriminator", out _))
+            throw new Exception("Primitive union schema must describe its untagged alternatives: " + flagSchema);
+        var petSchema = RequestSchema("/pet");
+        var pets = petSchema.GetProperty("anyOf").EnumerateArray().Select(Resolve).ToArray();
+        if (pets.Length != 2 || !pets.Any(schema => schema.GetProperty("properties").TryGetProperty("coat", out _)) ||
+            !pets.Any(schema => schema.GetProperty("properties").TryGetProperty("breed", out _)))
+            throw new Exception("Object union schema must preserve both case shapes: " + petSchema);
+        var paymentSchema = RequestSchema("/event");
+        if (paymentSchema.GetProperty("discriminator").GetProperty("propertyName").GetString() != "$type")
+            throw new Exception("Closed class schema must advertise its discriminator: " + paymentSchema);
+        var mapping = paymentSchema.GetProperty("discriminator").GetProperty("mapping");
+        if (!mapping.TryGetProperty("Authorized", out _) || !mapping.TryGetProperty("Failed", out _))
+            throw new Exception("Closed class schema must describe both derived types: " + paymentSchema);
+
+        JsonElement RequestSchema(string route) => Resolve(root.GetProperty("paths").GetProperty(route)
+            .GetProperty("post").GetProperty("requestBody").GetProperty("content")
+            .GetProperty("application/json").GetProperty("schema"));
+        JsonElement Resolve(JsonElement schema)
+        {
+            while (schema.TryGetProperty("$ref", out var reference))
+            {
+                var key = reference.GetString()!.Split('/').Last().Replace("~1", "/").Replace("~0", "~");
+                schema = root.GetProperty("components").GetProperty("schemas").GetProperty(key);
+            }
+            return schema;
+        }
+        """;
+
 }
