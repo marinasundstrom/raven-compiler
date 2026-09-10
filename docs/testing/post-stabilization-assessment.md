@@ -68,3 +68,9 @@ error. Existing valid constructor and record inheritance coverage remains green.
 Validation: compiler and driver builds, 86 focused checks, 30 neighboring record
 and partial-class checks, and the original CLI repro now exiting with a normal
 compiler error. The headless editor qualification is recorded in the [editor qualification report](editor-qualification-2026-09-10.md): 345 integration cases and 18 performance cases pass after two further slices. Live client validation and the release qualification rows remain open.
+
+The subsequent [.NET 11 RC 1 interoperability assessment](dotnet-11-rc1-union-interop.md)
+records native closed-class metadata, standard-union JSON alignment, preserved
+.NET 10 targeting, and the intentional closed-interface difference. Its focused
+checks do not replace the remaining release gates or qualify every ASP.NET Core
+integration.
