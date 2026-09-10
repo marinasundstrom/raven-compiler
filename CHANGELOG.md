@@ -6,6 +6,11 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Sealed interfaces now publish Raven's permitted-family metadata on both .NET 10
+  and .NET 11, preserving closed-family information for Raven consumers and
+  rejecting external implementations. Closed-family metadata also names hoisted
+  generic cases by their emitted identities. C# closed-interface support remains unavailable.
+
 - Standard `System.Union<...>` carriers now use native System.Text.Json union
   serialization when targeting .NET 11. The .NET 10 asset keeps its existing
   converter, JSON format, and case-selection behavior.

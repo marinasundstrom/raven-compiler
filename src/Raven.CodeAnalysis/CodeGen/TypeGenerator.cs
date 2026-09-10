@@ -223,6 +223,7 @@ internal class TypeGenerator
                 }
 
                 ApplyTypeCustomAttributes();
+                ApplyClosedHierarchyMetadata();
                 return;
             }
 
@@ -402,13 +403,7 @@ internal class TypeGenerator
             CodeGen.ApplyDiscriminatedUnionAttribute(TypeBuilder!.SetCustomAttribute);
         }
 
-        if (TypeSymbol is SourceNamedTypeSymbol sourceNamedType && sourceNamedType.IsSealedHierarchy)
-        {
-            CodeGen.ApplyClosedHierarchyAttribute(
-                sourceNamedType.TypeKind,
-                sourceNamedType.PermittedDirectSubtypes,
-                TypeBuilder!.SetCustomAttribute);
-        }
+        ApplyClosedHierarchyMetadata();
 
         if (TypeSymbol is SynthesizedUnionCompanionTypeSymbol companionType)
         {
@@ -418,6 +413,17 @@ internal class TypeGenerator
         }
 
         EnsureExtensionGroupingType();
+    }
+
+    private void ApplyClosedHierarchyMetadata()
+    {
+        if (TypeSymbol is SourceNamedTypeSymbol sourceNamedType && sourceNamedType.IsSealedHierarchy)
+        {
+            CodeGen.ApplyClosedHierarchyAttribute(
+                sourceNamedType.TypeKind,
+                sourceNamedType.PermittedDirectSubtypes,
+                TypeBuilder!.SetCustomAttribute);
+        }
     }
 
     private static INamedTypeSymbol? GetMetadataContainingType(INamedTypeSymbol type)
@@ -660,6 +666,11 @@ internal class TypeGenerator
            !SymbolEqualityComparer.Default.Equals(type, definition)
             ? definition
             : type;
+
+    internal static string GetEmittedTypeMetadataName(INamedTypeSymbol type)
+        => ShouldHoistNestedSealedHierarchyCase(type)
+            ? GetHoistedNestedTypeMetadataName(type)
+            : type.ToFullyQualifiedMetadataName();
 
     private static string GetHoistedNestedTypeMetadataName(INamedTypeSymbol type)
     {

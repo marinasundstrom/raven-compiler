@@ -757,7 +757,7 @@ internal class CodeGenerator
 
         foreach (var permittedType in permittedTypes)
         {
-            var typeName = $"{permittedType.ToFullyQualifiedMetadataName()}, {_compilation.AssemblyName}";
+            var typeName = $"{TypeGenerator.GetEmittedTypeMetadataName(permittedType)}, {_compilation.AssemblyName}";
             WriteSerString(stream, typeName);
         }
 

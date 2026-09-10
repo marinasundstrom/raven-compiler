@@ -220,7 +220,18 @@ internal abstract class TypeDeclarationBinder : Binder
         BaseTypeSyntax baseTypeSyntax,
         INamedTypeSymbol interfaceType)
     {
-        if (interfaceType is not SourceNamedTypeSymbol sourceInterface || !sourceInterface.IsSealedHierarchy)
+        if (interfaceType is not SourceNamedTypeSymbol sourceInterface)
+        {
+            if (interfaceType.IsSealedHierarchy)
+            {
+                Diagnostics.ReportCannotInheritFromClosedType(
+                    interfaceType.Name,
+                    baseTypeSyntax.GetLocation());
+            }
+            return;
+        }
+
+        if (!sourceInterface.IsSealedHierarchy)
             return;
 
         if (sourceInterface.HasExplicitPermits)

@@ -49,27 +49,45 @@ class Lit : Expr {}
     }
 
     [Theory]
-    [InlineData("net10.0", false)]
-    [InlineData("net11.0", true)]
-    public void SealedHierarchy_EmitsTargetFrameworkContract(string targetFramework, bool usesFrameworkContract)
+    [InlineData("net10.0", false, false)]
+    [InlineData("net11.0", true, false)]
+    [InlineData("net10.0", false, true)]
+    [InlineData("net11.0", false, true)]
+    public void SealedHierarchy_EmitsTargetFrameworkContract(
+        string targetFramework,
+        bool usesFrameworkContract,
+        bool isInterface)
     {
-        var source = """
-sealed class Expr {}
+        var source = $$"""
+sealed {{(isInterface ? "interface" : "class")}} Expr {}
 class Lit : Expr {}
 class Add : Expr {}
 """;
         var tree = SyntaxTree.ParseText(source, path: "file.rvn");
+        var references = TargetFrameworkResolver.GetReferenceAssemblies(
+                TargetFrameworkResolver.ResolveVersion(targetFramework))
+            .Where(File.Exists)
+            .Select(MetadataReference.CreateFromFile).ToArray();
         var compilation = Compilation.Create(
                 "sealed_hierarchy_attr",
                 [tree],
                 new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .AddReferences(TargetFrameworkResolver.GetReferenceAssemblies(
-                TargetFrameworkResolver.ResolveVersion(targetFramework))
-                .Where(File.Exists)
-                .Select(MetadataReference.CreateFromFile).ToArray());
+            .AddReferences(references);
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.True(result.Success, string.Join(System.Environment.NewLine, result.Diagnostics));
+
+        var consumer = Compilation.Create(
+                "closed_hierarchy_consumer",
+                options: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddReferences(references)
+            .AddReferences(MetadataReference.CreateFromImage(stream.ToArray()));
+        var imported = Assert.IsAssignableFrom<INamedTypeSymbol>(consumer.GetTypeByMetadataName("Expr"));
+        Assert.True(imported.IsSealedHierarchy);
+        Assert.Equal(["Lit", "Add"], imported.PermittedDirectSubtypes.Select(type => type.Name));
+        var externalDerivation = consumer.AddSyntaxTrees(SyntaxTree.ParseText("class External : Expr {}"));
+        Assert.Contains(externalDerivation.GetDiagnostics(), diagnostic =>
+            diagnostic.Descriptor == CompilerDiagnostics.CannotInheritFromClosedType);
 
         stream.Position = 0;
         var alc = new AssemblyLoadContext("SealedClosedHierarchyAttr", isCollectible: true);
