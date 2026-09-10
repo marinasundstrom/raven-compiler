@@ -158,13 +158,17 @@ Union runtime coverage is active in `UnionCodeGenTests`. Nullable payload fixtur
 use the current two-variant syntax; option conversions execute both populated
 and empty cases. Allocation behavior is checked directly instead of scanning IL.
 
+Portable PDB coverage is active in `PdbSequencePointTests`, including the ASP.NET
+project sequence-point integration check. Its subprocess uses the compiler
+already built by the test project and reports captured output on failure.
+
 Current explicit gaps:
 
 | Area | Gap | Preferred cleanup |
 |---|---|---|
 | Reference assembly diagnostics | file-scoped code and missing-main diagnostics require reference assemblies in some environments | Make the harness provide stable references or rewrite as compiler-only diagnostics |
 | Language server coverage | request/hover/workspace integration tests can run for minutes under the baseline runner | Split fast request/mapper/semantic presentation tests from workspace integration tests, then guard the latter separately before restoring them to a default gate |
-| Runtime CodeGen | stale runtime/reflection/emitted-shape classes are excluded from `scripts/test-runtime-isolated.sh`: `AttachedMacroCodeGenTests`, `PdbSequencePointTests`, `ProjectFileNuGetReferenceTests`, `PropertyTests`, `RuntimeSymbolResolverTests` | Reintroduce only focused runtime behavior checks; avoid emitted instruction/lowered shape assertions |
+| Runtime CodeGen | stale runtime/reflection/emitted-shape classes are excluded from `scripts/test-runtime-isolated.sh`: `AttachedMacroCodeGenTests`, `ProjectFileNuGetReferenceTests`, `PropertyTests`, `RuntimeSymbolResolverTests` | Reintroduce only focused runtime behavior checks; avoid emitted instruction/lowered shape assertions |
 | Project/CLI runtime | `MsBuildSampleProjectCompilationTests` can trip the runtime hang guard through `rvn`/MSBuild sample compilation | Replace with a bounded CLI smoke test or rely on `FORCE_REBUILD=1 samples/build.sh` for sample coverage |
 
 Positional/tuple pattern coverage is active in the runtime tier. The restored

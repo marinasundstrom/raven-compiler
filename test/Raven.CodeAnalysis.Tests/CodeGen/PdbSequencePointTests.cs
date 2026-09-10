@@ -912,9 +912,8 @@ class C {
         try
         {
             var compilerResult = RunCompiler(repoRoot, projectPath, outputDirectory, targetFramework: "net11.0");
-            Assert.Equal(
-                0,
-                compilerResult.ExitCode);
+            Assert.True(compilerResult.ExitCode == 0,
+                $"Compiler failed ({compilerResult.ExitCode}).\n{compilerResult.StdOut}\n{compilerResult.StdErr}");
 
             var assemblyPath = Path.Combine(outputDirectory, "AspNetMinimalApi.dll");
             var pdbPath = Path.Combine(outputDirectory, "AspNetMinimalApi.pdb");
@@ -1288,7 +1287,7 @@ class C {
     {
         var compilerProjectPath = Path.Combine(repoRoot, "src", "Raven.Compiler", "Raven.Compiler.csproj");
         var args =
-            $"run --framework {targetFramework} --project \"{compilerProjectPath}\" --property WarningLevel=0 -- " +
+            $"run --no-build --no-restore --framework {targetFramework} --project \"{compilerProjectPath}\" --property WarningLevel=0 -- " +
             $"\"{projectPath}\" -o \"{outputDirectory}\" --framework {targetFramework}";
 
         var startInfo = new ProcessStartInfo("dotnet", args)

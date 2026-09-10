@@ -26,7 +26,6 @@ build_stale_runtime_exclusion_filter() {
   local names=(
     "AttachedMacroCodeGenTests"
     "MsBuildSampleProjectCompilationTests"
-    "PdbSequencePointTests"
     "ProjectFileNuGetReferenceTests"
     "PropertyTests"
     "RuntimeSymbolResolverTests"
