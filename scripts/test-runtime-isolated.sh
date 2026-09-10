@@ -30,7 +30,6 @@ build_stale_runtime_exclusion_filter() {
     "FunctionExpressionCodeGenTests"
     "GenericInvocationCodeGenTests"
     "AttachedMacroCodeGenTests"
-    "MemberBindingCodeGenTests"
     "MsBuildSampleProjectCompilationTests"
     "PdbSequencePointTests"
     "PrimaryConstructorParameterCodeGenTests"

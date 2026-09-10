@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 
@@ -39,8 +40,10 @@ class Program {
         Assert.Equal(string.Empty, value);
     }
 
-    [Fact]
-    public void ExtensionPropertyGetter_ReturnsTargetTypedCaseInvocation_FromReturnStatement()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ExtensionPropertyGetter_ReturnsTargetTypedCaseInvocation_FromReturnStatement(bool success)
     {
         const string code = """
 union Option<T> {
@@ -65,9 +68,12 @@ extension ResultExtensions<T, E> for Result<T, E> {
 }
 
 class Program {
-    public static func Get() -> string {
-        let r: Result<int, string> = .Ok(42)
-        r.IsOk.ToString()
+    public static func Get(success: bool) -> int {
+        let r: Result<int, string> = if success { .Ok(42) } else { .Error("failure") }
+        return match r.IsOk {
+            .Some(let value) => value
+            .None => -1
+        }
     }
 }
 """;
@@ -88,28 +94,30 @@ class Program {
         var type = assembly.GetType("Program", throwOnError: true)!;
         var get = type.GetMethod("Get")!;
 
-        var value = (string)get.Invoke(null, Array.Empty<object>())!;
-        Assert.Contains("Some", value, StringComparison.Ordinal);
+        var value = (int)get.Invoke(null, [success])!;
+        Assert.Equal(success ? 42 : -1, value);
     }
 
-    [Fact]
-    public void GenericExtension_GetType_ResultCanBeStoredAsType()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericExtension_GetType_ResultCanBeStoredAsType(bool valueType)
     {
-        const string code = """
+        var code = $$"""
 import System.*
 import System.Collections.Generic.*
 
 extension TypeProbe<T> for T {
-    func TypeNameLength() -> int {
+    func RuntimeType() -> Type {
         let type = self.GetType()
-        return type.Name.Length
+        return type
     }
 }
 
 class Program {
-    public static func Run() -> int {
-        let obj = List<int>()
-        return obj.TypeNameLength()
+    public static func Run() -> Type {
+        let obj = {{(valueType ? "42" : "List<int>()")}}
+        return obj.RuntimeType()
     }
 }
 """;
@@ -130,8 +138,8 @@ class Program {
         var type = assembly.GetType("Program", throwOnError: true)!;
         var run = type.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
 
-        var value = (int)run.Invoke(null, Array.Empty<object>())!;
-        Assert.True(value > 0);
+        var value = Assert.IsAssignableFrom<Type>(run.Invoke(null, Array.Empty<object>()));
+        Assert.Equal(valueType ? typeof(int) : typeof(List<int>), value);
     }
 
     [Fact]
@@ -177,11 +185,13 @@ class Program {
         var run = type.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
 
         var value = (int)run.Invoke(null, Array.Empty<object>())!;
-        Assert.True(value > 0);
+        Assert.Equal(2, value);
     }
 
-    [Fact]
-    public void ResultWithMessage_GenericMapErrorLambda_ExecutesWithoutBadImageFormat()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ResultWithMessage_GenericMapErrorLambda_PreservesSuccessOrWrapsError(bool success)
     {
         const string code = """
 interface IError {
@@ -211,8 +221,8 @@ extension ErrorExtensions<TError: IError> for TError {
 extension ResultExtensions<T, E> for Result<T, E> {
     func MapError<E2>(mapper: E -> E2) -> Result<T, E2> {
         self match {
-            Ok(let value) => Ok(value)
-            Error(let error) => Error(mapper(error))
+            .Ok(let value) => .Ok(value)
+            .Error(let error) => .Error(mapper(error))
         }
     }
 }
@@ -224,13 +234,13 @@ extension ResultErrorContextExtensions<T, E: IError> for Result<T, E> {
 }
 
 class Program {
-    public static func Run() -> string {
-        let result: Result<int, ParseError> = Error(ParseError("invalid"))
+    public static func Run(success: bool) -> string {
+        let result: Result<int, ParseError> = if success { .Ok(42) } else { .Error(ParseError("invalid")) }
         let wrapped = result.WithMessage("context")
 
         return match wrapped {
-            case Ok(let value) => value.ToString()
-            Error(let error) => error.Message + ":" + error.Cause.Message
+            .Ok(let value) => value.ToString()
+            .Error(let error) => error.Message + ":" + error.Cause.Message
         }
     }
 }
@@ -252,7 +262,7 @@ class Program {
         var type = assembly.GetType("Program", throwOnError: true)!;
         var run = type.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
 
-        var value = (string)run.Invoke(null, Array.Empty<object>())!;
-        Assert.Equal("context:invalid", value);
+        var value = (string)run.Invoke(null, [success])!;
+        Assert.Equal(success ? "42" : "context:invalid", value);
     }
 }
