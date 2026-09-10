@@ -533,7 +533,7 @@ record class CustomError(message: string)
 
         var (compilation, tree) = CreateCompilation(
             source,
-            options: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+            options: new CompilationOptions(OutputKind.ConsoleApplication),
             references: TestMetadataReferences.DefaultWithRavenCore);
         compilation.EnsureSetup();
 
