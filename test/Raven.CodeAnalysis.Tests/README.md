@@ -17,7 +17,8 @@ Runtime, reflection, generated IL, process, NuGet, MSBuild, and sample-project c
 | Language-server perf | Opt-in language-server latency and interaction-budget checks | `scripts/test-language-server-perf.sh` |
 | Samples | End-to-end sample project build after compiler/runtime changes | `FORCE_REBUILD=1 samples/build.sh` |
 
-Main CI intentionally runs only the required tier. It does not pack SDK
+Main CI runs the required tier for pull requests targeting `main`, pushes to
+`main`, and manual dispatches. It does not pack SDK
 artifacts or run CodeGen/runtime, subprocess, CLI, NuGet/MSBuild project-system,
 sample, language-server integration, or performance tests. Those suites are
 valuable but too expensive or environment-sensitive to block every integrated
