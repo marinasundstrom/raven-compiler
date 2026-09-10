@@ -6,6 +6,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Watched changes to macro source files now include open consuming documents in
+  diagnostic refresh notifications after their macro references are updated.
+
 - Classes whose implicit base call has no parameterless constructor now report
   a semantic error instead of crashing during emission. This includes explicit,
   primary, and synthesized default constructors.

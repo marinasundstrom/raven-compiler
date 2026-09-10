@@ -153,6 +153,7 @@ internal sealed class WorkspaceManager
 
         lock (_gate)
         {
+            var solutionBeforeChanges = _workspace.CurrentSolution;
             var affectedProjectIds = new HashSet<ProjectId>();
             var requiresWorkspaceReload = false;
             var solutionGroupingChanged = false;
@@ -164,7 +165,17 @@ internal sealed class WorkspaceManager
             }
 
             if (!requiresWorkspaceReload)
+            {
+                // Source changes can also replace a macro reference in a consuming project.
+                // Include those projects so the watched-file handler republishes their diagnostics.
+                foreach (var project in _workspace.CurrentSolution.Projects)
+                {
+                    if (solutionBeforeChanges.GetProject(project.Id)?.Version != project.Version)
+                        affectedProjectIds.Add(project.Id);
+                }
+
                 return Task.FromResult(GetOpenDocumentUrisForProjects(affectedProjectIds));
+            }
 
             _failedProjectOpens.Clear();
             var openDocuments = new List<ReloadDocumentState>();

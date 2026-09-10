@@ -2034,7 +2034,7 @@ generated_code = false
         refreshedExpansion.ShouldBe("2");
     }
 
-    [Fact(Skip = "Stale watched-file macro refresh coverage: cache invalidation expectations need redesign around current project reload behavior.")]
+    [Fact]
     public async Task WatchedMacroProjectDocumentChange_RefreshesConsumingProjectMacroExpansionAsync()
     {
         Directory.CreateDirectory(_tempRoot);
@@ -2061,7 +2061,7 @@ generated_code = false
         initialExpansion.ShouldBe("1");
 
         File.WriteAllText(macroPath, CreateFreestandingMacroExpansionSource("2"));
-        await manager.ReloadForWatchedFilesAsync([
+        var documentsToRefresh = await manager.ReloadForWatchedFilesAsync([
             new FileEvent
             {
                 Uri = DocumentUri.FromFileSystemPath(macroPath),
@@ -2071,6 +2071,16 @@ generated_code = false
 
         var refreshedExpansion = await GetFreestandingMacroExpansionTextAsync(manager, appUri);
         refreshedExpansion.ShouldBe("2");
+        documentsToRefresh.ShouldContain(appUri);
+
+        var unchangedDocuments = await manager.ReloadForWatchedFilesAsync([
+            new FileEvent
+            {
+                Uri = DocumentUri.FromFileSystemPath(macroPath),
+                Type = FileChangeType.Changed
+            }
+        ]);
+        unchangedDocuments.ShouldBeEmpty();
     }
 
     [Fact]

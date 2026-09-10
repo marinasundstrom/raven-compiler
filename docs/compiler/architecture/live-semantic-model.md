@@ -296,6 +296,9 @@ Important validation scenarios:
 - body-only edits preserve unrelated semantic state;
 - wrapping top-level statements in `func Main` recovers deterministically;
 - cross-file additions update the active project snapshot;
+- watched macro-source changes refresh consumer references and include open
+  consumer documents in the diagnostic publication set; repeated notifications
+  with unchanged source do not trigger another publication;
 - lambda and extension-method chains bind in receiver order;
 - analyzer diagnostics remain visible while newer analyzer work is pending;
 - compiler diagnostics remain visible across unrelated edits while newer
