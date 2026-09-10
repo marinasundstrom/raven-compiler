@@ -66,6 +66,8 @@ Do not run `Raven.LanguageServer.Tests` merely because a language feature change
 
 A skipped test is not covered by the baseline. Keep skipped tests visible and either restore them as fast syntax/semantic coverage, move them into isolated runtime coverage, or delete/replace them when they are stale.
 
+Enabled runtime tests must execute their output assertions. Runtime helpers must propagate execution failures, including missing runtime members, rather than returning a sentinel that lets the test pass without checking behavior. `MatchExpressionCodeGenTests` follows this rule; its list middle-rest case remains explicitly skipped pending the emission fix.
+
 ## Project Boundaries
 
 Keep compiler and editor-adjacent coverage in the project that owns the behavior:

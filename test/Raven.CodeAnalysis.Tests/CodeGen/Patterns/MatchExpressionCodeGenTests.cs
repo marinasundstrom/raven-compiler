@@ -56,8 +56,6 @@ System.Console.WriteLine(result)
 """;
 
         var output = EmitAndRun(code, "match_value_type");
-        if (output is null)
-            return;
         Assert.Equal("42", output);
     }
 
@@ -85,8 +83,6 @@ class Describer {
 """;
 
         var output = EmitAndRun(code, "match_return_value");
-        if (output is null)
-            return;
         Assert.Equal("zero,2", output);
     }
 
@@ -196,8 +192,6 @@ System.Console.WriteLine(foo + "," + empty)
 """;
 
         var output = EmitAndRun(code, "match_string_literal");
-        if (output is null)
-            return;
         Assert.Equal("str,None", output);
     }
 
@@ -223,8 +217,6 @@ class Program {
 """;
 
         var output = EmitAndRun(code, "match_array_collection_pattern");
-        if (output is null)
-            return;
 
         Assert.Equal("5", output);
     }
@@ -251,8 +243,6 @@ class Program {
 """;
 
         var output = EmitAndRun(code, "match_array_collection_pattern_middle_rest");
-        if (output is null)
-            return;
 
         Assert.Equal("9", output);
     }
@@ -281,8 +271,6 @@ class Program {
 """;
 
         var output = EmitAndRun(code, "match_list_collection_pattern_middle_rest");
-        if (output is null)
-            return;
 
         Assert.Equal("9", output);
     }
@@ -309,8 +297,6 @@ class Program {
 """;
 
         var output = EmitAndRun(code, "match_array_collection_pattern_fixed_segment");
-        if (output is null)
-            return;
 
         Assert.Equal("9", output);
     }
@@ -337,8 +323,6 @@ class Program {
 """;
 
         var output = EmitAndRun(code, "match_string_collection_pattern_fixed_segment");
-        if (output is null)
-            return;
 
         Assert.Equal("r:un:e", output);
     }
@@ -413,8 +397,6 @@ class Program {
 """;
 
         var output = EmitAndRun(code, "match_union_identifier_expression");
-        if (output is null)
-            return;
 
         Assert.Equal("hello,none", output);
     }
@@ -445,8 +427,6 @@ union Result<T, TError> {
 """;
 
         var output = EmitAndRun(code, "match_generic_union");
-        if (output is null)
-            return;
 
         Assert.Equal("ok 99\nerror 'boom'", output.Replace("\r\n", "\n", StringComparison.Ordinal));
     }
@@ -477,8 +457,6 @@ class Program {
 """;
 
         var output = EmitAndRun(code, "match_union_parameterless_instantiation");
-        if (output is null)
-            return;
 
         Assert.Equal("foo,none", output);
     }
@@ -580,14 +558,14 @@ class Program {
         return single;
     }
 
-    private static string? EmitAndRun(string code, string assemblyName, params string[] additionalSources)
+    private static string EmitAndRun(string code, string assemblyName, params string[] additionalSources)
         => EmitAndRunCore(
             code,
             assemblyName,
             new CompilationOptions(OutputKind.ConsoleApplication),
             additionalSources);
 
-    private static string? EmitAndRunRelease(string code, string assemblyName)
+    private static string EmitAndRunRelease(string code, string assemblyName)
         => EmitAndRunCore(
             code,
             assemblyName,
@@ -595,7 +573,7 @@ class Program {
                 .WithOptimizationLevel(OptimizationLevel.Release),
             []);
 
-    private static string? EmitAndRunCore(
+    private static string EmitAndRunCore(
         string code,
         string assemblyName,
         CompilationOptions options,
@@ -637,16 +615,7 @@ class Program {
                 _ => throw new InvalidOperationException("Unexpected entry point signature."),
             };
 
-            try
-            {
-                entryPoint.Invoke(null, arguments);
-            }
-            catch (TargetInvocationException invocationException)
-                when (invocationException.InnerException is MissingMethodException mme
-                    && mme.Message.Contains("System.Runtime.CompilerServices.ITuple", StringComparison.Ordinal))
-            {
-                return null;
-            }
+            entryPoint.Invoke(null, arguments);
         }
         finally
         {
