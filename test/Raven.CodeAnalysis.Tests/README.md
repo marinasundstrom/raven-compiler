@@ -67,7 +67,7 @@ Do not run `Raven.LanguageServer.Tests` merely because a language feature change
 
 A skipped test is not covered by the baseline. Keep skipped tests visible and either restore them as fast syntax/semantic coverage, move them into isolated runtime coverage, or delete/replace them when they are stale.
 
-Enabled runtime tests must execute their output assertions. Runtime helpers must propagate execution failures, including missing runtime members, rather than returning a sentinel that lets the test pass without checking behavior. `MatchExpressionCodeGenTests` follows this rule; its list middle-rest case remains explicitly skipped pending the emission fix.
+Enabled runtime tests must execute their output assertions. Runtime helpers must propagate execution failures, including missing runtime members, rather than returning a sentinel that lets the test pass without checking behavior. `MatchExpressionCodeGenTests` follows this rule, including list middle-rest captures with empty and non-empty slices and inputs too short to match.
 
 ## Project Boundaries
 
@@ -91,7 +91,7 @@ Current explicit gaps:
 | Language server coverage | request/hover/workspace integration tests can run for minutes under the baseline runner | Split fast request/mapper/semantic presentation tests from workspace integration tests, then guard the latter separately before restoring them to a default gate |
 | Runtime CodeGen | stale runtime/reflection/emitted-shape classes are excluded from `scripts/test-runtime-isolated.sh`: `AsyncPropagateCodeGenTests`, `AsyncTryAwaitCodeGenTests`, `ByRefCodeGenTests`, `ExpressionBodyCodeGenTests`, `FunctionExpressionCodeGenTests`, `GenericInvocationCodeGenTests`, `AttachedMacroCodeGenTests`, `MemberBindingCodeGenTests`, `PdbSequencePointTests`, `PrimaryConstructorParameterCodeGenTests`, `ProjectFileNuGetReferenceTests`, `PropertyTests`, `RuntimeAsyncCodeGenTests`, `RuntimeSymbolResolverTests`, `TryExpressionCodeGenTests`, `TypeOfExpressionCodeGenTests`, `TypeResolutionPrecedenceTests`, `UnionCodeGenTests` | Reintroduce only focused runtime behavior checks; avoid emitted instruction/lowered shape assertions |
 | Project/CLI runtime | `MsBuildSampleProjectCompilationTests` can trip the runtime hang guard through `rvn`/MSBuild sample compilation | Replace with a bounded CLI smoke test or rely on `FORCE_REBUILD=1 samples/build.sh` for sample coverage |
-| Runtime CodeGen | legacy async, positional-pattern, and list middle-rest collection-pattern CodeGen skips | Replace with isolated runtime behavior tests, not emitted-shape assertions |
+| Runtime CodeGen | legacy async and positional-pattern CodeGen skips | Replace with isolated runtime behavior tests, not emitted-shape assertions |
 
 ## Area Runs
 

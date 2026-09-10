@@ -6232,15 +6232,12 @@ internal partial class ExpressionGenerator : Generator
             return false;
 
         var enumerableType = enumerableTypeDefinition.Construct(targetType.TypeArguments[0]);
-        var constructor = targetType.Constructors.FirstOrDefault(static ctor =>
+        var constructor = targetType.Constructors.FirstOrDefault(ctor =>
             !ctor.IsStatic &&
-            ctor.Parameters.Length == 1) as IMethodSymbol;
+            ctor.Parameters.Length == 1 &&
+            SymbolEqualityComparer.Default.Equals(ctor.Parameters[0].Type, enumerableType)) as IMethodSymbol;
 
         if (constructor is null)
-            return false;
-
-        var parameterType = constructor.Parameters[0].Type;
-        if (!SymbolEqualityComparer.Default.Equals(parameterType, enumerableType))
             return false;
 
         ILGenerator.Emit(OpCodes.Newobj, GetConstructorInfo(constructor));

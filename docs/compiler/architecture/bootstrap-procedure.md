@@ -196,7 +196,6 @@ resolved or explicitly excluded from the compiler-writing subset:
 | --- | --- | --- |
 | Nested async lambdas with captures | Runtime test is skipped pending current async lowering | Reproduce, fix or define exclusion, and add observable runtime coverage |
 | Positional/tuple pattern emission | Five code-generation tests are skipped as unstable | Stabilize declarations, assignments, and match emission used by compiler-shaped data flow |
-| List pattern with a middle rest | Array form passes; `List<T>` form is skipped because the captured rest becomes null | Fix collection-rest construction and test observable contents |
 | Async resource lifetime across `await` | Legacy test is skipped pending replacement | Add current semantic/runtime coverage before relying on `use` in async compiler code |
 
 The C# compiler source also identifies the following high-value translation

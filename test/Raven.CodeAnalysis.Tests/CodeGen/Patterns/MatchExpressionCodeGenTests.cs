@@ -247,16 +247,27 @@ class Program {
         Assert.Equal("9", output);
     }
 
-    [Fact(Skip = "List collection pattern middle-rest emission currently produces a null rest list; keep isolated until CodeGen is fixed.")]
-    public void MatchExpression_WithListCollectionPatternMiddleRest_EmitsAndRuns()
+    [Theory]
+    [InlineData("[]", "none")]
+    [InlineData("[2]", "none")]
+    [InlineData("[2, 4]", "2::4")]
+    [InlineData("[2, 3, 4]", "2:3,:4")]
+    [InlineData("[2, 3, 5, 4]", "2:3,5,:4")]
+    public void MatchExpression_WithListCollectionPatternMiddleRest_EmitsAndRuns(string values, string expected)
     {
-        const string code = """
+        var code = $$"""
 import System.Collections.Generic.*
 
 class Formatter {
     public func Describe(values: List<int>) -> string {
         return match values {
-            [let first, ..let middle, let last] => (first + middle[0] + last).ToString()
+            [let first, ..let middle, let last] => {
+                var description = first.ToString() + ":"
+                for item in middle {
+                    description = description + item.ToString() + ","
+                }
+                description + ":" + last.ToString()
+            }
             _ => "none"
         }
     }
@@ -265,14 +276,14 @@ class Formatter {
 class Program {
     static func Main() {
         let formatter = Formatter()
-        System.Console.WriteLine(formatter.Describe([2, 3, 4]))
+        System.Console.WriteLine(formatter.Describe({{values}}))
     }
 }
 """;
 
         var output = EmitAndRun(code, "match_list_collection_pattern_middle_rest");
 
-        Assert.Equal("9", output);
+        Assert.Equal(expected, output);
     }
 
     [Fact]

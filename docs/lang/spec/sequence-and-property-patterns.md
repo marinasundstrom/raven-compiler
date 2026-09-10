@@ -36,7 +36,11 @@ about without unpacking the value step by step.
   * If a sequence pattern contains an open rest segment, the input length must
     be at least the total fixed width of the non-rest elements.
   * For arrays and indexable collections, single-element captures bind the element
-    type and segment captures bind an array slice.
+    type. Segment captures preserve `List<T>`, `ImmutableList<T>`, and
+    `ImmutableArray<T>` when the input has one of those types; other indexable
+    collections and arrays produce array slices. Captured segments contain the
+    selected elements in order, including an empty collection when an open rest
+    segment consumes no elements.
   * When the input is a fixed-length array `T[N]`, captured fixed/rest array
     segments preserve an inferred fixed length when the segment width is
     statically known. For example, `[let a, let b, ...let rest]` against

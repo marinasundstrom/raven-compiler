@@ -6,6 +6,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- List sequence-pattern captures now select the `IEnumerable<T>` constructor
+  when materializing a slice, avoiding invalid captured lists when the capacity
+  constructor appears first in metadata.
 - Playground compilation works on single-threaded WebAssembly again: declaration
   access avoids unsupported semaphore waits while preserving cancellation checks.
 - Incremental compilations no longer keep a chain of earlier compilations alive
