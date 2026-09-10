@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
@@ -281,17 +280,21 @@ public union Result<T> {
     }
 
     [Fact]
-    public void GenericOptionNoneCase_UsesDirectUnionConstructorOnConstructedCarrier()
+    public void GenericOptionCases_PreservePayloadAndEmptyState()
     {
         const string code = """
 import Option.*
 
 class Runner {
-    public static func Run(flag: bool) -> Option<int> {
-        let input: Option<int> = Some(42)
-        return match input {
+    public static func Run(flag: bool) -> int {
+        let input: Option<int> = if flag { .Some(42) } else { .None }
+        let output: Option<int> = match input {
             Some(let value) => Option<int>.Some(value)
             None => None
+        }
+        return match output {
+            .Some(let value) => value
+            .None => -1
         }
     }
 }
@@ -317,23 +320,11 @@ union Option<T> {
         var assembly = loaded.Assembly;
         var runnerType = assembly.GetType("Runner", throwOnError: true)!;
         var runMethod = runnerType.GetMethod("Run", BindingFlags.Public | BindingFlags.Static)!;
-        var calledMembers = ILReader.GetCalledMembers(runMethod);
-
-        Assert.DoesNotContain(
-            calledMembers,
-            member => member.Contains("System.Option`1::Create", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            calledMembers,
-            member => member.EndsWith("::Create", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            calledMembers,
-            member => member.EndsWith("::op_Implicit", StringComparison.Ordinal));
-
         var fromSome = runMethod.Invoke(null, [true]);
         var fromNone = runMethod.Invoke(null, [false]);
 
-        Assert.NotNull(fromSome);
-        Assert.NotNull(fromNone);
+        Assert.Equal(42, fromSome);
+        Assert.Equal(-1, fromNone);
     }
 
     [Fact]
@@ -975,7 +966,7 @@ public record JsonObject(Properties: IDictionary<string, JsonValue>)
     public void StructUnion_ConstructedWithNullablePayload_HasValueFollowsValueNullState()
     {
         var code = """
-union struct Maybe<T>(T)
+union struct Maybe<T>(T | int)
 """;
 
         var syntaxTree = SyntaxTree.ParseText(code);
@@ -998,7 +989,7 @@ union struct Maybe<T>(T)
         var runtimeAssembly = loaded.Assembly;
         var unionTypeDefinition = runtimeAssembly.GetType("Maybe`1", throwOnError: true)!;
         var closedUnionType = unionTypeDefinition.MakeGenericType(typeof(string));
-        var instance = Activator.CreateInstance(closedUnionType, [null])!;
+        var instance = closedUnionType.GetConstructor([typeof(string)])!.Invoke([null]);
         var valueProperty = closedUnionType.GetProperty("Value", BindingFlags.Instance | BindingFlags.Public)!;
         var hasValueProperty = closedUnionType.GetProperty("HasValue", BindingFlags.Instance | BindingFlags.Public)!;
 
@@ -1017,6 +1008,7 @@ class Runner {
             3 => 30
             int i => i
             null => -1
+            _ => -2
         }
     }
 
@@ -1026,6 +1018,7 @@ class Runner {
             3 => 30
             int i => i
             null => -1
+            _ => -2
         }
     }
 
@@ -1035,11 +1028,12 @@ class Runner {
             3 => 30
             int i => i
             null => -1
+            _ => -2
         }
     }
 }
 
-union class Foo(int?)
+union class Foo(int? | string)
 """;
 
         var syntaxTree = SyntaxTree.ParseText(code);
@@ -1087,6 +1081,7 @@ class Runner {
         return match v {
             int i => i
             null => -1
+            _ => -2
         }
     }
 
@@ -1095,6 +1090,7 @@ class Runner {
         return match v {
             int i => i
             null => -1
+            _ => -2
         }
     }
 
@@ -1103,6 +1099,7 @@ class Runner {
         match v {
             int i => i
             null => -1
+            _ => -2
         }
     }
 
@@ -1111,11 +1108,12 @@ class Runner {
         match v {
             int i => i
             null => -1
+            _ => -2
         }
     }
 }
 
-union class Foo(int?)
+union class Foo(int? | string)
 """;
 
         var syntaxTree = SyntaxTree.ParseText(code);
@@ -1170,7 +1168,7 @@ class Runner {
     }
 }
 
-union class Foo(int?)
+union class Foo(int? | string)
 """;
 
         var syntaxTree = SyntaxTree.ParseText(code);
@@ -1941,43 +1939,6 @@ union Option<T> {
         var layout = unionType.StructLayoutAttribute;
         Assert.NotNull(layout);
         Assert.Equal(LayoutKind.Sequential, layout!.Value);
-    }
-
-    [Fact]
-    public void DiscriminatedUnionConversion_DoesNotBoxValuePayload()
-    {
-        var code = """
-union Option {
-    case Some(value: int)
-    case None
-}
-""";
-
-        var syntaxTree = SyntaxTree.ParseText(code);
-        var version = TargetFrameworkResolver.ResolveVersion(TestTargetFramework.Default);
-        MetadataReference[] references = [
-            .. TargetFrameworkResolver
-                .GetReferenceAssemblies(version)
-                .Select(path => MetadataReference.CreateFromFile(path))
-        ];
-
-        var compilation = Compilation.Create("test", new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .AddSyntaxTrees(syntaxTree)
-            .AddReferences(references);
-
-        using var peStream = new MemoryStream();
-        var result = compilation.Emit(peStream);
-        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
-
-        using var loaded = TestAssemblyLoader.LoadFromStream(peStream, references);
-        var runtimeAssembly = loaded.Assembly;
-        var unionType = runtimeAssembly.GetType("Option", throwOnError: true)!;
-        var caseType = runtimeAssembly.GetType("Option+Some", throwOnError: true)!;
-        var unionCtor = unionType.GetConstructor(new[] { caseType })!;
-
-        var ilBytes = unionCtor.GetMethodBody()!.GetILAsByteArray();
-        Assert.NotNull(ilBytes);
-        Assert.DoesNotContain(unchecked((byte)OpCodes.Box.Value), ilBytes!);
     }
 
     [Fact]

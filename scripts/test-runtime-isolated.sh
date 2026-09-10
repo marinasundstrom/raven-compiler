@@ -30,7 +30,6 @@ build_stale_runtime_exclusion_filter() {
     "ProjectFileNuGetReferenceTests"
     "PropertyTests"
     "RuntimeSymbolResolverTests"
-    "UnionCodeGenTests"
   )
 
   for name in "${names[@]}"; do
