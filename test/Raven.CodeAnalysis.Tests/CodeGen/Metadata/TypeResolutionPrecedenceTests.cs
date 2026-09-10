@@ -152,8 +152,10 @@ public union Result<T> {
 
     }
 
-    [Fact]
-    public void LocalGenericUnion_ShadowsImportedMetadataUnionOfSameArity()
+    [Theory]
+    [InlineData(42, 2, "Yay!|Bang! (!!!)")]
+    [InlineData(1, 7, "Result: 1|Bang! (7)")]
+    public void LocalGenericUnion_ShadowsImportedMetadataUnionOfSameArity(int value, int errorCode, string expected)
     {
         const string metadataSource = """
 namespace System {
@@ -181,15 +183,20 @@ namespace System {
         const string source = """
 import System.*
 
-let first : Result<int, string> = .Success(1)
-let second : Result<int, string> = .Error(2, "Bang!")
+class Runner {
+    static func Describe(result: Result<int, string>) -> string {
+        return match result {
+            .Success(42) => "Yay!"
+            .Success(let value) => "Result: " + value.ToString()
+            .Error(2, let error) => error + " (!!!)"
+            .Error(let code, let error) => error + " (" + code.ToString() + ")"
+        }
+    }
 
-func describe(result: Result<int, string>) -> string {
-    return match result {
-        .Success(42) => "Yay!"
-        .Success(let value) => "Result: '$value'"
-        .Error(2, let error) => "$error (!!!)"
-        .Error(let code, let error) => "$error ($code)"
+    static func Run(value: int, code: int) -> string {
+        let first: Result<int, string> = .Success(value)
+        let second: Result<int, string> = .Error(code, "Bang!")
+        return Describe(first) + "|" + Describe(second)
     }
 }
 
@@ -201,7 +208,7 @@ public union Result<TSuccess, TError> {
 
         var (compilation, tree) = CreateCompilation(
             source,
-            options: new CompilationOptions(OutputKind.ConsoleApplication),
+            options: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary),
             references: [.. TestMetadataReferences.Default, metadataReference]);
 
         compilation.EnsureSetup();
@@ -210,7 +217,7 @@ public union Result<TSuccess, TError> {
         var root = tree.GetRoot();
         var unionDeclaration = root.DescendantNodes().OfType<UnionDeclarationSyntax>().Single();
         var unionSymbol = Assert.IsAssignableFrom<INamedTypeSymbol>(model.GetDeclaredSymbol(unionDeclaration));
-        var functionDeclaration = root.DescendantNodes().OfType<FunctionStatementSyntax>().Single();
+        var functionDeclaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Describe");
         var functionSymbol = Assert.IsAssignableFrom<IMethodSymbol>(model.GetDeclaredSymbol(functionDeclaration));
         var functionParameterType = Assert.IsAssignableFrom<INamedTypeSymbol>(Assert.Single(functionSymbol.Parameters).Type);
         Assert.True(
@@ -224,5 +231,13 @@ public union Result<TSuccess, TError> {
         Assert.True(
             diagnostics.Length == 0,
             string.Join(Environment.NewLine, diagnostics.Select(diagnostic => diagnostic.ToString())));
+
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        using var loaded = TestAssemblyLoader.LoadFromStream(stream, [.. TestMetadataReferences.Default, metadataReference]);
+        var run = loaded.Assembly.GetType("Runner", throwOnError: true)!.GetMethod("Run")!;
+        Assert.Equal(expected, run.Invoke(null, [value, errorCode]));
+
     }
 }

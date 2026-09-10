@@ -141,13 +141,19 @@ constructor metadata, and async access to constructor state and method parameter
 after controlled suspension, including success and error payloads. Run this slice with
 `dotnet test test/Raven.CodeAnalysis.Tests/Raven.CodeAnalysis.Tests.csproj --filter 'FullyQualifiedName~.PrimaryConstructorParameterCodeGenTests.' /property:WarningLevel=0`.
 
+Source-versus-metadata precedence coverage is active in
+`TypeResolutionPrecedenceTests`. It checks source-union symbol identity and
+case conversions, then executes construction and matching when an imported
+assembly defines a union with the same name and arity. Run this slice with
+`dotnet test test/Raven.CodeAnalysis.Tests/Raven.CodeAnalysis.Tests.csproj --filter 'FullyQualifiedName~.TypeResolutionPrecedenceTests.' /property:WarningLevel=0`.
+
 Current explicit gaps:
 
 | Area | Gap | Preferred cleanup |
 |---|---|---|
 | Reference assembly diagnostics | file-scoped code and missing-main diagnostics require reference assemblies in some environments | Make the harness provide stable references or rewrite as compiler-only diagnostics |
 | Language server coverage | request/hover/workspace integration tests can run for minutes under the baseline runner | Split fast request/mapper/semantic presentation tests from workspace integration tests, then guard the latter separately before restoring them to a default gate |
-| Runtime CodeGen | stale runtime/reflection/emitted-shape classes are excluded from `scripts/test-runtime-isolated.sh`: `AsyncPropagateCodeGenTests`, `AsyncTryAwaitCodeGenTests`, `AttachedMacroCodeGenTests`, `PdbSequencePointTests`, `ProjectFileNuGetReferenceTests`, `PropertyTests`, `RuntimeAsyncCodeGenTests`, `RuntimeSymbolResolverTests`, `TryExpressionCodeGenTests`, `TypeResolutionPrecedenceTests`, `UnionCodeGenTests` | Reintroduce only focused runtime behavior checks; avoid emitted instruction/lowered shape assertions |
+| Runtime CodeGen | stale runtime/reflection/emitted-shape classes are excluded from `scripts/test-runtime-isolated.sh`: `AsyncPropagateCodeGenTests`, `AsyncTryAwaitCodeGenTests`, `AttachedMacroCodeGenTests`, `PdbSequencePointTests`, `ProjectFileNuGetReferenceTests`, `PropertyTests`, `RuntimeAsyncCodeGenTests`, `RuntimeSymbolResolverTests`, `TryExpressionCodeGenTests`, `UnionCodeGenTests` | Reintroduce only focused runtime behavior checks; avoid emitted instruction/lowered shape assertions |
 | Project/CLI runtime | `MsBuildSampleProjectCompilationTests` can trip the runtime hang guard through `rvn`/MSBuild sample compilation | Replace with a bounded CLI smoke test or rely on `FORCE_REBUILD=1 samples/build.sh` for sample coverage |
 
 Positional/tuple pattern coverage is active in the runtime tier. The restored
