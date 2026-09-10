@@ -67,7 +67,7 @@ internal sealed class ClassDeclarationBinder : TypeDeclarationBinder
     public void ValidateImplicitBaseConstructors()
     {
         var type = ContainingSymbol;
-        if (type.IsStatic || type.IsValueType || type.BaseType is not { TypeKind: not TypeKind.Error } baseType)
+        if (type.IsStatic || type.IsValueType || type.BaseType is not { IsStatic: false, TypeKind: not TypeKind.Error } baseType)
             return;
 
         if (baseType.Constructors.Any(static constructor => !constructor.IsStatic && constructor.Parameters.Length == 0))

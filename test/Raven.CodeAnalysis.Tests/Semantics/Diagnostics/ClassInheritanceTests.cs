@@ -44,14 +44,13 @@ class Dog : Animal {}
         Assert.False(symbol.IsClosed);
     }
 
-    [Fact]
-    public void StaticBaseClass_DerivationProducesDiagnostic()
+    [Theory]
+    [InlineData("class Derived : Parent {}")]
+    [InlineData("class Derived : Parent { init() {} }")]
+    [InlineData("class Derived() : Parent {}")]
+    public void StaticBaseClass_DerivationProducesDiagnostic(string derivedDeclaration)
     {
-        var source = """
-static class Parent {}
-
-class Derived : Parent {}
-""";
+        var source = "static class Parent {}\n" + derivedDeclaration;
         var tree = SyntaxTree.ParseText(source);
         var compilation = CreateCompilation(tree, new CompilationOptions(OutputKind.DynamicallyLinkedLibrary), assemblyName: "lib");
         var diagnostics = compilation.GetDiagnostics();
