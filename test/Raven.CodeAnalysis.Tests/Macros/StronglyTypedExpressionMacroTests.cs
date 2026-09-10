@@ -39,7 +39,7 @@ public sealed class StronglyTypedExpressionMacroTests
 
         var consumer = Compilation.Create(
                 "TypedMacroConsumer",
-                new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                new CompilationOptions(OutputKind.ConsoleApplication))
             .AddReferences(TestMetadataReferences.Default)
             .AddMacroReferences(MacroReference.CreateFromImage(image.ToArray()))
             .AddSyntaxTrees(SyntaxTree.ParseText(
@@ -101,7 +101,7 @@ public sealed class StronglyTypedExpressionMacroTests
     private static Compilation CreateCompilation(string source, params IMacroDefinition[] macros)
         => Compilation.Create(
                 "StronglyTypedExpressionMacros",
-                new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                new CompilationOptions(OutputKind.ConsoleApplication))
             .AddReferences(TestMetadataReferences.Default)
             .AddMacroReferences(macros.Select(static macro => new MacroReference(macro)).ToArray())
             .AddSyntaxTrees(SyntaxTree.ParseText($$"""
