@@ -92,7 +92,10 @@ Async resource lifetime is covered by the active runtime class
 `AsyncResourceLifetimeCodeGenTests`. It replaces the old skipped emit-only case
 in the excluded `AsyncTryAwaitCodeGenTests` class, using a controlled incomplete
 task to verify disposal before completion and reverse cleanup order for return,
-exceptions, and cancellation. Run this slice with
+exceptions, and cancellation. It also replaces the return-type-only disposal
+check from `AsyncPropagateCodeGenTests`, verifying `?` carrier propagation and
+`try? await` exception capture across suspension, including success payloads,
+error payloads, skipped continuation code, and resource cleanup. Run this slice with
 `dotnet test test/Raven.CodeAnalysis.Tests/Raven.CodeAnalysis.Tests.csproj --filter 'FullyQualifiedName~.AsyncResourceLifetimeCodeGenTests.' /property:WarningLevel=0`.
 
 Current explicit gaps:

@@ -121,4 +121,91 @@ class Program {
             gate.TrySetCanceled();
         }
     }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Propagation_DisposesResourcesBeforeCompletion(bool captureException, bool fail)
+    {
+        var source = $$"""
+import System.*
+import System.Collections.Generic.*
+import System.Threading.Tasks.*
+
+class Probe(name: string, trace: List<string>) : IDisposable {
+    func Dispose() -> () {
+        trace.Add("dispose:" + name)
+    }
+}
+
+class Program {
+    static func MakeResult(value: int, fail: bool) -> Result<int, Exception> {
+        if fail { return .Error(InvalidOperationException("boom")) }
+        return .Ok(value)
+    }
+
+    static async func Fetch(trace: List<string>, gate: Task<int>, fail: bool) -> Task<Result<int, Exception>> {
+        trace.Add("entered")
+        use first = Probe("first", trace)
+        use second = Probe("second", trace)
+        {{(captureException ? "let value = try? await gate" : "let value = MakeResult(await gate, fail)?")}}
+        trace.Add("continued")
+        return .Ok(value)
+    }
+
+    static async func Run(trace: List<string>, gate: Task<int>, fail: bool) -> Task<string> {
+        let result = await Fetch(trace, gate, fail)
+        return match result {
+            .Ok(let value) => "ok:" + value.ToString()
+            .Error(let error) => "error:" + error.Message
+        }
+    }
+}
+""";
+
+        MetadataReference[] references =
+        [
+            .. TestMetadataReferences.Default,
+            MetadataReference.CreateFromFile(Path.Combine(AppContext.BaseDirectory, "Raven.Core.dll"))
+        ];
+        var compilation = Compilation.Create("async-resource-propagation", new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddSyntaxTrees(SyntaxTree.ParseText(source))
+            .AddReferences(references);
+
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+
+        using var loaded = TestAssemblyLoader.LoadFromStream(stream, references);
+        var method = loaded.Assembly.GetType("Program")!.GetMethod("Run")!;
+        var trace = new List<string>();
+        var gate = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var task = Assert.IsAssignableFrom<Task<string>>(method.Invoke(null, [trace, gate.Task, fail]));
+
+        try
+        {
+            Assert.False(task.IsCompleted);
+            Assert.Equal(new[] { "entered" }, trace);
+
+            if (captureException && fail)
+                gate.SetException(new InvalidOperationException("boom"));
+            else
+                gate.SetResult(42);
+
+            Assert.Equal(fail ? "error:boom" : "ok:42", await task.WaitAsync(TimeSpan.FromSeconds(10)));
+            var expected = new List<string> { "entered" };
+            if (!fail)
+                expected.Add("continued");
+            expected.Add("dispose:second");
+            expected.Add("dispose:first");
+            Assert.Equal(expected, trace);
+        }
+        finally
+        {
+            gate.TrySetCanceled();
+        }
+    }
+
 }

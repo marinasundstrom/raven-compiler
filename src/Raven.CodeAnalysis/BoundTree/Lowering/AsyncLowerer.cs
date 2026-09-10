@@ -250,12 +250,12 @@ internal static class AsyncLowerer
         if (!compilation.IsRuntimeAsyncEnabled)
         {
             var stateMachineHasUsingDeclaration = ContainsUsingDeclaration(body);
-            var preStateMachineMatchLowerer = new AsyncMatchLowerer(symbol);
-            var preStateMachineMatchLowered = preStateMachineMatchLowerer.Rewrite(body);
+            var preStateMachineExpressionLowerer = new AsyncControlFlowExpressionLowerer(symbol);
+            var preStateMachineExpressionsLowered = preStateMachineExpressionLowerer.Rewrite(body);
 
             // For state-machine async we must still preserve implicit returns (last expression in a block)
             // without lowering `use` declarations into try/finally (which would dispose too early on suspension).
-            var withImplicitReturn = RewriteImplicitReturnIfNeeded(symbol, preStateMachineMatchLowered);
+            var withImplicitReturn = RewriteImplicitReturnIfNeeded(symbol, preStateMachineExpressionsLowered);
             return stateMachineHasUsingDeclaration
                 ? withImplicitReturn
                 : Lowerer.LowerBlock(symbol, withImplicitReturn);
@@ -268,17 +268,17 @@ internal static class AsyncLowerer
 
         // Normalize using declarations into try/finally before await/state-machine
         // rewriting so dispatch guards are computed against final protected regions.
-        // Match constructs must be lowered before async state-machine rewriting so
-        // MoveNext bodies don't carry BoundMatch* nodes into codegen.
-        var matchLowerer = new AsyncMatchLowerer(symbol);
-        var withMatchLowered = matchLowerer.Rewrite(normalizedUseDeclarations);
+        // Match and propagation expressions must expose their control flow before
+        // async rewriting plans resume dispatch and completion cleanup.
+        var expressionLowerer = new AsyncControlFlowExpressionLowerer(symbol);
+        var withExpressionsLowered = expressionLowerer.Rewrite(normalizedUseDeclarations);
 
         // Lower propagate and other general block constructs after the async pre-normalization
         // steps so introduced locals/flow align with the final pre-state-machine shape.
         if (hadUsingDeclaration)
-            return withMatchLowered;
+            return withExpressionsLowered;
 
-        return Lowerer.LowerBlock(symbol, withMatchLowered);
+        return Lowerer.LowerBlock(symbol, withExpressionsLowered);
     }
 
     private static BoundBlockStatement RewriteImplicitReturnIfNeeded(ISymbol symbol, BoundBlockStatement body)
@@ -397,12 +397,12 @@ internal static class AsyncLowerer
             requiresReceiverAddress: requiresReceiverAddress);
     }
 
-    private sealed class AsyncMatchLowerer : BoundTreeRewriter
+    private sealed class AsyncControlFlowExpressionLowerer : BoundTreeRewriter
     {
         private readonly ISymbol _containingSymbol;
         private int _rewriteOrdinal;
 
-        public AsyncMatchLowerer(ISymbol containingSymbol)
+        public AsyncControlFlowExpressionLowerer(ISymbol containingSymbol)
         {
             _containingSymbol = containingSymbol ?? throw new ArgumentNullException(nameof(containingSymbol));
         }
@@ -422,6 +422,16 @@ internal static class AsyncLowerer
         public override BoundNode? VisitMatchExpression(BoundMatchExpression node)
         {
             var rewritten = (BoundMatchExpression?)base.VisitMatchExpression(node) ?? node;
+            var lowered = Lowerer.LowerExpression(_containingSymbol, rewritten);
+            return (BoundExpression)RewriteLoweredLabels(lowered);
+        }
+
+        public override BoundNode? VisitPropagateExpression(BoundPropagateExpression node)
+        {
+            // Propagation introduces early returns and protected regions. Expose
+            // them before await rewriting so suspension dispatch and resource
+            // cleanup see the same control flow as explicit source returns.
+            var rewritten = (BoundPropagateExpression?)base.VisitPropagateExpression(node) ?? node;
             var lowered = Lowerer.LowerExpression(_containingSymbol, rewritten);
             return (BoundExpression)RewriteLoweredLabels(lowered);
         }

@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Async error propagation with `use` now preserves suspension and disposes
+  resources before returning a propagated failure. Both carrier `?` and
+  `try? await` expose their early returns before async state-machine lowering.
+
 - Async `use` resources are disposed before successful task completion, including
   explicit returns from exception handlers and resources acquired after an await.
   Hoisted resources now retain declaration order so cleanup runs in reverse order
