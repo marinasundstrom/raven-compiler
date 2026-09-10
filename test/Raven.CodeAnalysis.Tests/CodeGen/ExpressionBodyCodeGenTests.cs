@@ -64,10 +64,12 @@ class Foo : IDisposable {
         Assert.Equal(new[] { "Init", "Dispose" }, output);
     }
 
-    [Fact]
-    public void FunctionStatementExpressionBody_ReturnsExpectedValue()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void FunctionStatementExpressionBody_ReturnsExpectedValue(bool hasValue)
     {
-        const string code = """
+        var code = $$"""
 union Option<T> {
     case Some(value: T)
     case None
@@ -75,12 +77,12 @@ union Option<T> {
 
 class Program {
     public static func Run() -> string {
-        func GetMessage() -> Option<string> => Some("Hello, World!")
+        func GetMessage() -> Option<string> => {{(hasValue ? ".Some(\"Hello, World!\")" : ".None")}}
 
         let message = GetMessage()
         return match message {
-            Some(let value) => value
-            None => "<none>"
+            .Some(let value) => value
+            .None => "<none>"
         }
     }
 }
@@ -106,7 +108,7 @@ class Program {
         Assert.NotNull(runMethod);
 
         var output = runMethod!.Invoke(null, Array.Empty<object?>());
-        Assert.Equal("Hello, World!", output);
+        Assert.Equal(hasValue ? "Hello, World!" : "<none>", output);
     }
 
     [Fact]
@@ -149,10 +151,12 @@ class Program {
         Assert.Equal(42, output);
     }
 
-    [Fact]
-    public void PropertyGetterAccessorExpressionBody_ReturnsExpectedValue()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PropertyGetterAccessorExpressionBody_ReturnsExpectedValue(bool hasValue)
     {
-        const string code = """
+        var code = $$"""
 union Option<T> {
     case Some(value: T)
     case None
@@ -160,7 +164,7 @@ union Option<T> {
 
 class Holder {
     public val Message: Option<string> {
-        get => Some("Hello, World!")
+        get => {{(hasValue ? ".Some(\"Hello, World!\")" : ".None")}}
     }
 }
 
@@ -169,8 +173,8 @@ class Program {
         let holder = Holder()
         let message = holder.Message
         return match message {
-            Some(let value) => value
-            None => "<none>"
+            .Some(let value) => value
+            .None => "<none>"
         }
     }
 }
@@ -196,20 +200,22 @@ class Program {
         Assert.NotNull(runMethod);
 
         var output = runMethod!.Invoke(null, Array.Empty<object?>());
-        Assert.Equal("Hello, World!", output);
+        Assert.Equal(hasValue ? "Hello, World!" : "<none>", output);
     }
 
-    [Fact]
-    public void PropertyExpressionBody_ReturnsExpectedValue()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PropertyExpressionBody_ReturnsExpectedValue(bool hasValue)
     {
-        const string code = """
+        var code = $$"""
 union Option<T> {
     case Some(value: T)
     case None
 }
 
 class Holder {
-    public val Message: Option<string> => Some("Hello, World!")
+    public val Message: Option<string> => {{(hasValue ? ".Some(\"Hello, World!\")" : ".None")}}
 }
 
 class Program {
@@ -217,8 +223,8 @@ class Program {
         let holder = Holder()
         let message = holder.Message
         return match message {
-            Some(let value) => value
-            None => "<none>"
+            .Some(let value) => value
+            .None => "<none>"
         }
     }
 }
@@ -244,7 +250,7 @@ class Program {
         Assert.NotNull(runMethod);
 
         var output = runMethod!.Invoke(null, Array.Empty<object?>());
-        Assert.Equal("Hello, World!", output);
+        Assert.Equal(hasValue ? "Hello, World!" : "<none>", output);
     }
 
 }
