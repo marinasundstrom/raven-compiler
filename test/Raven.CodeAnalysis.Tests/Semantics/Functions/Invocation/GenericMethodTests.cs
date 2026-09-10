@@ -270,7 +270,7 @@ func Apply<TInput, TResult>(value: TInput, transform: Func<TInput, TResult>) -> 
             "higher_order_generic_consumer",
             useMetadata ? [consumerTree] : [SyntaxTree.ParseText(librarySource), consumerTree],
             references,
-            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CompilationOptions(OutputKind.ConsoleApplication));
         if (diagnosticsFirst)
             Assert.Empty(compilation.GetDiagnostics());
 
@@ -442,7 +442,7 @@ func Apply<TInput, TResult>(value: TInput, transform: Func<TInput, TResult>) -> 
         var workspace = RavenWorkspace.Create(targetFramework: TestMetadataReferences.TargetFramework);
         var projectId = workspace.AddProject(
             "generic-method-group-edit",
-            compilationOptions: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+            compilationOptions: new CompilationOptions(OutputKind.ConsoleApplication),
             targetFramework: TestMetadataReferences.TargetFramework);
         var project = workspace.CurrentSolution.GetProject(projectId)!;
 
@@ -1292,7 +1292,7 @@ func Apply<TInput, TResult>(value: TInput, transform: Func<TInput, TResult>) -> 
         var workspace = RavenWorkspace.Create(targetFramework: TestMetadataReferences.TargetFramework);
         var projectId = workspace.AddProject(
             "metadata-generic-constraint-edit",
-            compilationOptions: new CompilationOptions(OutputKind.DynamicallyLinkedLibrary),
+            compilationOptions: new CompilationOptions(OutputKind.ConsoleApplication),
             targetFramework: TestMetadataReferences.TargetFramework);
         var project = workspace.CurrentSolution.GetProject(projectId)!;
 
