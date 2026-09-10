@@ -24,11 +24,8 @@ build_additional_isolated_names() {
 build_stale_runtime_exclusion_filter() {
   local filter=""
   local names=(
-    "AttachedMacroCodeGenTests"
     "MsBuildSampleProjectCompilationTests"
     "ProjectFileNuGetReferenceTests"
-    "PropertyTests"
-    "RuntimeSymbolResolverTests"
   )
 
   for name in "${names[@]}"; do
