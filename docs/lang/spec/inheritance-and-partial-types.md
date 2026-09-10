@@ -85,7 +85,24 @@ class Add : Expr {}
 ```
 
 Sealed interfaces follow the same closure rules, but their direct subtypes are any classes, records, structs, or interfaces
-that list the sealed interface directly in their base list:
+that list the sealed interface directly in their base list.
+
+**.NET interoperability:** closed interfaces are an intentional Raven extension.
+C# 15 / .NET 11 RC 1 supports closed classes and record classes, but not closed
+interfaces. Raven therefore keeps its own permitted-type metadata for sealed
+interfaces on both .NET 10 and .NET 11. They remain ordinary CLR interfaces to
+C# consumers: C# does not enforce their closed family or treat a switch covering
+Raven's permitted implementations as exhaustive. Use a default arm at that
+boundary. `System.Text.Json` does not infer the permitted implementations from
+Raven's interface metadata; configure interface polymorphism explicitly when
+serializing through that interface.
+
+Closed classes targeting .NET 11 use the native framework contract. Targeting
+.NET 10 preserves Raven's existing union and sealed-hierarchy contracts; running
+the compiler on .NET 11 does not change the selected target's metadata. See
+[.NET implementation notes](dotnet-implementation.md#sealed-hierarchies).
+
+For example:
 
 ```raven
 sealed interface HttpResponse permits Success, NotFound {}

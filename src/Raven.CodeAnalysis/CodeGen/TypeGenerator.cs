@@ -405,6 +405,7 @@ internal class TypeGenerator
         if (TypeSymbol is SourceNamedTypeSymbol sourceNamedType && sourceNamedType.IsSealedHierarchy)
         {
             CodeGen.ApplyClosedHierarchyAttribute(
+                sourceNamedType.TypeKind,
                 sourceNamedType.PermittedDirectSubtypes,
                 TypeBuilder!.SetCustomAttribute);
         }

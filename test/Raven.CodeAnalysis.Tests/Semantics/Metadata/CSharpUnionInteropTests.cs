@@ -51,6 +51,7 @@ public sealed class CSharpUnionInteropTests
                     <LangVersion>preview</LangVersion>
                     <Nullable>enable</Nullable>
                     <ImplicitUsings>enable</ImplicitUsings>
+                    <WarningsAsErrors>CS8509</WarningsAsErrors>
                   </PropertyGroup>
 
                   <ItemGroup>
@@ -138,6 +139,27 @@ public sealed class CSharpUnionInteropTests
                 if (!error.TryGetValue(out RavenProduced.Result.Error<string> extractedError) || extractedError.Error != "bad")
                     return Fail("Generic companion case should preserve only its required generic parameter.");
 
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    InferClosedTypePolymorphism = true
+                };
+                PaymentEvent payment = new Authorized("id", 42m);
+                var json = System.Text.Json.JsonSerializer.Serialize(payment, jsonOptions);
+                if (!json.Contains("\"$type\":\"Authorized\"") || !json.Contains("\"Amount\":42"))
+                    return Fail("Closed hierarchy JSON should preserve its discriminator and derived data: " + json);
+                if (System.Text.Json.JsonSerializer.Deserialize<PaymentEvent>(json, jsonOptions)
+                    is not Authorized { Amount: 42m, PaymentId: "id" })
+                    return Fail("Closed hierarchy JSON should round-trip the derived record.");
+
+                // CS8509 is an error in this consumer: no discard arm is necessary.
+                var description = payment switch
+                {
+                    Authorized => "authorized",
+                    Failed => "failed"
+                };
+                if (description != "authorized")
+                    return Fail("C# should match the Raven closed hierarchy.");
+
                 return 0;
                 """);
 
@@ -155,7 +177,7 @@ public sealed class CSharpUnionInteropTests
     }
 
     [Fact]
-    public void CSharpUnionFromLatestSdk_ImportsNullableContent()
+    public void CSharpTypesFromLatestSdk_ImportUnionsAndClosedHierarchies()
     {
         if (!TryGetLatestDotNet11Sdk(out var sdkVersion))
             return;
@@ -198,6 +220,16 @@ public sealed class CSharpUnionInteropTests
                 namespace CSharpUnionFixture;
 
                 public union Foo(int, double?);
+
+                public closed record Event;
+                public record Created(int Value) : Event;
+                public sealed record Updated(int Value) : Created(Value);
+                public static class Nested
+                {
+                    public sealed record Removed : Event;
+                }
+                public sealed record Unrelated;
+
 
                 [Union]
                 public sealed class CustomClass : IUnion
@@ -269,6 +301,16 @@ public sealed class CSharpUnionInteropTests
                 [],
                 [.. net11References, MetadataReference.CreateFromFile(referencePath)]);
             var fixtureNamespace = compilation.GlobalNamespace.GetMembers("CSharpUnionFixture").OfType<INamespaceSymbol>().Single();
+            var closedEvent = Assert.IsAssignableFrom<INamedTypeSymbol>(
+                compilation.GetTypeByMetadataName("CSharpUnionFixture.Event"));
+            Assert.True(closedEvent.IsSealedHierarchy);
+            Assert.Equal(["Created", "Removed"],
+                closedEvent.PermittedDirectSubtypes.Select(type => type.Name).Order());
+            var invalidDerivation = compilation.AddSyntaxTrees(SyntaxTree.ParseText(
+                "public record ExternalEvent : CSharpUnionFixture.Event"));
+            Assert.Contains(invalidDerivation.GetDiagnostics(), diagnostic =>
+                diagnostic.Descriptor == CompilerDiagnostics.CannotInheritFromClosedType);
+
             var foo = fixtureNamespace.GetMembers("Foo").OfType<IUnionSymbol>().Single();
 
             Assert.True(foo.ContentMayBeNull);
@@ -345,6 +387,10 @@ public sealed class CSharpUnionInteropTests
                 case Text(value: string)
                 case Number(value: int)
             }
+
+            public sealed record PaymentEvent(PaymentId: string) permits Authorized, Failed
+            public record Authorized(PaymentId: string, Amount: decimal) : PaymentEvent(PaymentId)
+            public record Failed(PaymentId: string, Reason: string) : PaymentEvent(PaymentId)
 
             public union Result<T, E> {
                 case Ok(value: T)

@@ -75,7 +75,22 @@ internal partial class PENamedTypeSymbol
             foreach (var attributeHandle in typeDefinition.GetCustomAttributes())
             {
                 var attribute = reader.GetCustomAttribute(attributeHandle);
-                if (!IsClosedHierarchyAttributeConstructor(reader, attribute.Constructor))
+                if (IsClosedHierarchyAttributeConstructor(reader, attribute.Constructor, "IsClosedTypeAttribute"))
+                {
+                    // As in C#, discover the authoritative family from direct bases
+                    // in the declaring module. DerivedTypes is the runtime JSON hint.
+                    var root = _typeInfo.IsGenericType
+                        ? _typeInfo.GetGenericTypeDefinition()
+                        : _typeInfo.AsType();
+                    permittedTypeNames = _typeInfo.Module.GetTypes()
+                        .Where(type => type.BaseType is { } baseType &&
+                            (baseType.IsGenericType ? baseType.GetGenericTypeDefinition() : baseType) == root)
+                        .Select(type => type.FullName!)
+                        .ToImmutableArray();
+                    return true;
+                }
+
+                if (!IsClosedHierarchyAttributeConstructor(reader, attribute.Constructor, ClosedHierarchyAttributeName))
                     continue;
 
                 var valueReader = reader.GetBlobReader(attribute.Value);
@@ -115,7 +130,8 @@ internal partial class PENamedTypeSymbol
 
     private static bool IsClosedHierarchyAttributeConstructor(
         MetadataReader reader,
-        EntityHandle constructor)
+        EntityHandle constructor,
+        string attributeName)
     {
         var attributeType = constructor.Kind switch
         {
@@ -131,29 +147,31 @@ internal partial class PENamedTypeSymbol
         {
             HandleKind.TypeReference => IsClosedHierarchyAttribute(
                 reader,
-                reader.GetTypeReference((TypeReferenceHandle)attributeType)),
+                reader.GetTypeReference((TypeReferenceHandle)attributeType), attributeName),
             HandleKind.TypeDefinition => IsClosedHierarchyAttribute(
                 reader,
-                reader.GetTypeDefinition((TypeDefinitionHandle)attributeType)),
+                reader.GetTypeDefinition((TypeDefinitionHandle)attributeType), attributeName),
             _ => false
         };
     }
 
     private static bool IsClosedHierarchyAttribute(
         MetadataReader reader,
-        TypeReference type)
+        TypeReference type,
+        string attributeName)
         => reader.StringComparer.Equals(
                type.Namespace,
                ClosedHierarchyAttributeNamespace) &&
-           reader.StringComparer.Equals(type.Name, ClosedHierarchyAttributeName);
+           reader.StringComparer.Equals(type.Name, attributeName);
 
     private static bool IsClosedHierarchyAttribute(
         MetadataReader reader,
-        TypeDefinition type)
+        TypeDefinition type,
+        string attributeName)
         => reader.StringComparer.Equals(
                type.Namespace,
                ClosedHierarchyAttributeNamespace) &&
-           reader.StringComparer.Equals(type.Name, ClosedHierarchyAttributeName);
+           reader.StringComparer.Equals(type.Name, attributeName);
 
     private static string GetUnqualifiedMetadataName(string serializedTypeName)
     {

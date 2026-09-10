@@ -6,6 +6,7 @@ using System.Runtime.Loader;
 
 using Raven.CodeAnalysis;
 using Raven.CodeAnalysis.Syntax;
+using Raven.CodeAnalysis.Testing;
 using Raven.CodeAnalysis.Tests;
 
 using Xunit;
@@ -47,8 +48,10 @@ class Lit : Expr {}
         }
     }
 
-    [Fact]
-    public void SealedHierarchy_EmitsClosedHierarchyAttribute()
+    [Theory]
+    [InlineData("net10.0", false)]
+    [InlineData("net11.0", true)]
+    public void SealedHierarchy_EmitsTargetFrameworkContract(string targetFramework, bool usesFrameworkContract)
     {
         var source = """
 sealed class Expr {}
@@ -60,7 +63,10 @@ class Add : Expr {}
                 "sealed_hierarchy_attr",
                 [tree],
                 new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .AddReferences(TestMetadataReferences.Default);
+            .AddReferences(TargetFrameworkResolver.GetReferenceAssemblies(
+                TargetFrameworkResolver.ResolveVersion(targetFramework))
+                .Where(File.Exists)
+                .Select(MetadataReference.CreateFromFile).ToArray());
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.True(result.Success, string.Join(System.Environment.NewLine, result.Diagnostics));
@@ -74,16 +80,30 @@ class Add : Expr {}
             Assert.NotNull(exprType);
 
             var attributes = exprType!.GetCustomAttributesData();
-            var closedAttr = attributes.FirstOrDefault(a =>
-                a.AttributeType.FullName == "System.Runtime.CompilerServices.ClosedHierarchyAttribute");
-            Assert.NotNull(closedAttr);
+            var expectedName = usesFrameworkContract
+                ? "System.Runtime.CompilerServices.IsClosedTypeAttribute"
+                : "System.Runtime.CompilerServices.ClosedHierarchyAttribute";
+            var closedAttr = Assert.Single(attributes, a => a.AttributeType.FullName == expectedName);
+            IReadOnlyCollection<CustomAttributeTypedArgument> types;
+            if (usesFrameworkContract)
+            {
+                Assert.Empty(closedAttr.ConstructorArguments);
+                var derivedTypes = Assert.Single(closedAttr.NamedArguments);
+                Assert.Equal("DerivedTypes", derivedTypes.MemberName);
+                types = Assert.IsAssignableFrom<IReadOnlyCollection<CustomAttributeTypedArgument>>(
+                    derivedTypes.TypedValue.Value);
+                Assert.Equal(typeof(object).Assembly, closedAttr.AttributeType.Assembly);
+                Assert.DoesNotContain(attributes, a => a.AttributeType.Name == "ClosedHierarchyAttribute");
+            }
+            else
+            {
+                types = Assert.IsAssignableFrom<IReadOnlyCollection<CustomAttributeTypedArgument>>(
+                    Assert.Single(closedAttr.ConstructorArguments).Value);
+                Assert.Equal(assembly, closedAttr.AttributeType.Assembly);
+                Assert.DoesNotContain(attributes, a => a.AttributeType.Name == "IsClosedTypeAttribute");
+            }
+            Assert.Equal(["Lit", "Add"], types.Select(argument => ((Type)argument.Value!).Name));
 
-            var permittedTypeArguments = Assert.IsAssignableFrom<IReadOnlyCollection<CustomAttributeTypedArgument>>(
-                closedAttr!.ConstructorArguments.Single().Value);
-            var permittedTypes = permittedTypeArguments
-                .Select(argument => Assert.IsAssignableFrom<Type>(argument.Value))
-                .ToArray();
-            Assert.Equal(["Lit", "Add"], permittedTypes.Select(type => type.Name));
         }
         finally
         {

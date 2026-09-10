@@ -719,19 +719,40 @@ internal class CodeGenerator
     }
 
     internal void ApplyClosedHierarchyAttribute(
+        TypeKind typeKind,
         ImmutableArray<INamedTypeSymbol> permittedTypes,
         Action<ConstructorInfo, byte[]> apply)
     {
+        const string nativeMetadataName = "System.Runtime.CompilerServices.IsClosedTypeAttribute";
+        if (typeKind == TypeKind.Class && TargetRuntimeTypeExists(nativeMetadataName))
+        {
+            var attributeType = ResolveReferencedRuntimeType(nativeMetadataName)!;
+            var constructor = attributeType.GetConstructor(Type.EmptyTypes)
+                ?? throw new InvalidOperationException("Missing IsClosedTypeAttribute() constructor.");
+            apply(constructor, CreateClosedHierarchyAttributeBlob(permittedTypes, useFrameworkContract: true));
+            return;
+        }
+
         EnsureClosedHierarchyAttributeType();
         apply(_closedHierarchyCtor!, CreateClosedHierarchyAttributeBlob(permittedTypes));
     }
 
-    private byte[] CreateClosedHierarchyAttributeBlob(ImmutableArray<INamedTypeSymbol> permittedTypes)
+    private byte[] CreateClosedHierarchyAttributeBlob(
+        ImmutableArray<INamedTypeSymbol> permittedTypes,
+        bool useFrameworkContract = false)
     {
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
 
         writer.Write((ushort)1);
+        if (useFrameworkContract)
+        {
+            writer.Write((ushort)1); // One named property argument.
+            writer.Write((byte)0x54); // Property.
+            writer.Write((byte)0x1D); // Single-dimensional array.
+            writer.Write((byte)0x50); // System.Type element.
+            WriteSerString(stream, "DerivedTypes");
+        }
         writer.Write(permittedTypes.Length);
 
         foreach (var permittedType in permittedTypes)
@@ -740,7 +761,8 @@ internal class CodeGenerator
             WriteSerString(stream, typeName);
         }
 
-        writer.Write((ushort)0);
+        if (!useFrameworkContract)
+            writer.Write((ushort)0);
         return stream.ToArray();
     }
 

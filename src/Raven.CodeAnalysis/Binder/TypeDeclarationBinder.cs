@@ -207,7 +207,7 @@ internal abstract class TypeDeclarationBinder : Binder
             return;
         }
 
-        if (baseType.IsClosed)
+        if (baseType.IsClosed || baseType.IsSealedHierarchy)
         {
             Diagnostics.ReportCannotInheritFromClosedType(
                 baseType.Name,

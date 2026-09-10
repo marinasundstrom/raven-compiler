@@ -246,8 +246,16 @@ the carrier reference itself.
 
 A Raven sealed-hierarchy root is emitted as an abstract CLR type rather than an
 IL-sealed type, allowing its permitted cases to inherit from it. The root also
-receives a `ClosedHierarchy` attribute containing the permitted `Type[]` set so
-reflection can recover the closed family.
+receives the framework's `System.Runtime.CompilerServices.IsClosedTypeAttribute`
+with its `DerivedTypes` property when targeting .NET 11. C# consumers recognize the closed family, and
+`System.Text.Json` can infer its derived types when closed-type polymorphism is
+explicitly enabled. Raven imports this marker from C# assemblies and discovers
+direct subclasses in the declaring module; deriving from an imported closed
+root is an error.
+
+Closed interfaces are a Raven extension, outside C# 15's closed-class contract.
+They retain Raven's `ClosedHierarchyAttribute(Type[])` metadata, as do targets
+whose reference assemblies do not provide `IsClosedTypeAttribute`.
 
 ## Generic variance
 

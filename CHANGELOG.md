@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- .NET 11 closed class hierarchies now emit the framework `IsClosedTypeAttribute`,
+  enabling C# exhaustive switches and opt-in System.Text.Json polymorphism.
+  Raven recognizes C# closed hierarchies and rejects external direct derivation.
+
 - Invalid inheritance from a static class reports its inheritance diagnostic
   without an unrelated missing-base-constructor error.
 
