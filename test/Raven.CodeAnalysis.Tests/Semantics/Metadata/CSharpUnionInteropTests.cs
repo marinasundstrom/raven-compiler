@@ -260,6 +260,11 @@ public sealed class CSharpUnionInteropTests
 
                 public union Foo(int, double?);
 
+                public closed record GenericEvent<T>;
+                public sealed record GenericCreated<T>(T Value) : GenericEvent<T>;
+                public sealed record GenericRemoved<T> : GenericEvent<T>;
+
+
                 public closed record Event;
                 public record Created(int Value) : Event;
                 public sealed record Updated(int Value) : Created(Value);
@@ -349,6 +354,12 @@ public sealed class CSharpUnionInteropTests
                 "public record ExternalEvent : CSharpUnionFixture.Event"));
             Assert.Contains(invalidDerivation.GetDiagnostics(), diagnostic =>
                 diagnostic.Descriptor == CompilerDiagnostics.CannotInheritFromClosedType);
+
+            var genericEvent = Assert.IsAssignableFrom<INamedTypeSymbol>(
+                compilation.GetTypeByMetadataName("CSharpUnionFixture.GenericEvent`1"));
+            Assert.True(genericEvent.IsSealedHierarchy);
+            Assert.Equal(["GenericCreated", "GenericRemoved"],
+                genericEvent.PermittedDirectSubtypes.Select(type => type.Name).Order());
 
             var foo = fixtureNamespace.GetMembers("Foo").OfType<IUnionSymbol>().Single();
 

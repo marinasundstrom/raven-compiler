@@ -100,13 +100,82 @@ classification, closed-class round-trips, and malformed-body rejection. Both
 modes pass in `AspNetCoreUnionInteropTests`; generated mode also checks that RDG
 produced source without fallback diagnostics. OpenAPI checks pass in both modes
 and verify boolean/string alternatives, structural object-case schemas, and
-closed-class discriminator mappings. SignalR and Blazor remain follow-ups. C# custom
-`IUnionMembers` provider shapes and broader generic closed-family exhaustiveness
-also need dedicated qualification before claiming universal interoperability.
+closed-class discriminator mappings. SignalR and Blazor remain follow-ups. Dedicated qualification below found gaps in C# `IUnionMembers` providers and
+constructed generic closed-family matching. Universal interoperability is not
+yet established.
 
 Earlier project-wide release gates ran on Preview 7. Their results must not be
 relabeled as RC 1 results; the full baseline interrupted during SDK installation
 is not a completed gate.
+
+## Generic closed-hierarchy qualification
+
+C# generic closed roots import their closed marker and direct generic case
+names correctly; this is now covered in `CSharpUnionInteropTests`. However,
+constructed-family matching is still a compatibility gap. This RC 1 fixture:
+
+```csharp
+public closed record GenericEvent<T>;
+public sealed record GenericCreated<T>(T Value) : GenericEvent<T>;
+public sealed record GenericRemoved<T> : GenericEvent<T>;
+```
+
+imports, but a Raven match over `GenericEvent<int>` with arms for
+`GenericCreated<int>` and `GenericRemoved<int>` reports RAV2102 for the patterns
+and RAV2100 for missing open `GenericCreated<T>` / `GenericRemoved<T>` cases.
+The probe therefore does **not** qualify generic-family exhaustiveness. Fixing
+projection and generic-base identity must precede a claim of compatibility;
+follow it with constrained, specialized, reordered-parameter, and unbound-case
+coverage. The earlier passing tests for hoisted Raven cases prove metadata
+loadability and execution, not this C# generic matching contract.
+
+## Provider-union qualification
+
+RC 1 accepts this C# contract and its exhaustive switch (compile as a `net11.0`
+library with `LangVersion=preview` and nullable annotations enabled):
+
+```csharp
+using System.Runtime.CompilerServices;
+
+[Union]
+public sealed class Provided : Provided.IUnionMembers
+{
+    private readonly object _value;
+    private Provided(object value) => _value = value;
+    public Provided(decimal value) => _value = value;
+    object IUnionMembers.Value => _value;
+
+    public interface IUnionMembers
+    {
+        public static Provided Create(int value) => new((object)value);
+        public static Provided Create(string value) => new((object)value);
+        object Value { get; }
+    }
+
+    public static int Check()
+    {
+        Provided value = 42;
+        return value switch { int number => number, string => -1 };
+    }
+}
+```
+
+**This provider shape is not yet interoperable with Raven's union semantics.**
+The RC 1 probe compiled successfully, but Raven imported `Provided` as an ordinary
+class, not an `IUnionSymbol`. The public decimal constructor intentionally is not
+a member of the C# union: the provider's `Create` methods define its int/string
+contents. Raven's current shape recognizer requires a public carrier `Value`
+property and public constructors; its member discovery, conversion selection,
+and pattern emission also assume the carrier surface. Merely relaxing the
+recognizer would select the wrong cases or emit invalid calls.
+
+A complete implementation must select the provider consistently for factory
+conversion, `Value`, optional `HasValue`, and optional `TryGetValue`, including
+explicit interface implementation, structs, generics, nullable contents, and
+by-reference factory arguments. The regression should require the same observed
+result from C# and Raven; the current incorrect import is not a contract to
+preserve. Ordinary constructor-based C# unions remain covered by the passing
+interop tests above.
 
 ## References
 
