@@ -91,7 +91,17 @@ Current explicit gaps:
 | Language server coverage | request/hover/workspace integration tests can run for minutes under the baseline runner | Split fast request/mapper/semantic presentation tests from workspace integration tests, then guard the latter separately before restoring them to a default gate |
 | Runtime CodeGen | stale runtime/reflection/emitted-shape classes are excluded from `scripts/test-runtime-isolated.sh`: `AsyncPropagateCodeGenTests`, `AsyncTryAwaitCodeGenTests`, `ByRefCodeGenTests`, `ExpressionBodyCodeGenTests`, `FunctionExpressionCodeGenTests`, `GenericInvocationCodeGenTests`, `AttachedMacroCodeGenTests`, `MemberBindingCodeGenTests`, `PdbSequencePointTests`, `PrimaryConstructorParameterCodeGenTests`, `ProjectFileNuGetReferenceTests`, `PropertyTests`, `RuntimeAsyncCodeGenTests`, `RuntimeSymbolResolverTests`, `TryExpressionCodeGenTests`, `TypeOfExpressionCodeGenTests`, `TypeResolutionPrecedenceTests`, `UnionCodeGenTests` | Reintroduce only focused runtime behavior checks; avoid emitted instruction/lowered shape assertions |
 | Project/CLI runtime | `MsBuildSampleProjectCompilationTests` can trip the runtime hang guard through `rvn`/MSBuild sample compilation | Replace with a bounded CLI smoke test or rely on `FORCE_REBUILD=1 samples/build.sh` for sample coverage |
-| Runtime CodeGen | legacy async and positional-pattern CodeGen skips | Replace with isolated runtime behavior tests, not emitted-shape assertions |
+| Runtime CodeGen | legacy async CodeGen skips | Replace with isolated runtime behavior tests, not emitted-shape assertions |
+
+Positional/tuple pattern coverage is active in the runtime tier. The restored
+`PositionalPatternCodeGenTests` execute tuple matches, immutable and mutable
+declarations, and assignments to existing locals, and verify fallback behavior
+for mismatched tuple lengths, element types, and non-tuple values. Run this slice
+with:
+
+```bash
+dotnet test test/Raven.CodeAnalysis.Tests/Raven.CodeAnalysis.Tests.csproj --filter 'FullyQualifiedName~.PositionalPatternCodeGenTests.' /property:WarningLevel=0
+```
 
 ## Area Runs
 

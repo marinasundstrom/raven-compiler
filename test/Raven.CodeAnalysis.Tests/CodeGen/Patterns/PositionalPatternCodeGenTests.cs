@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 
 using Raven.CodeAnalysis;
 using Raven.CodeAnalysis.Syntax;
@@ -12,10 +11,14 @@ namespace Raven.CodeAnalysis.Tests;
 
 public class PositionalPatternCodeGenTests
 {
-    [Fact(Skip = "Positional pattern codegen is currently unstable and tracked separately.")]
-    public void MatchExpression_WithPositionalPattern_EmitsSuccessfully()
+    [Theory]
+    [InlineData("(1, 2)", "3")]
+    [InlineData("(1, 2, 3)", "no match")]
+    [InlineData("(1, \"two\")", "no match")]
+    [InlineData("42", "no match")]
+    public void MatchExpression_WithPositionalPattern_EmitsAndRuns(string value, string expected)
     {
-        const string code = """
+        var code = $$"""
 import System.*
 
 func describe(value: object) -> string {
@@ -26,25 +29,16 @@ func describe(value: object) -> string {
 }
 
 func Main() {
-    let value: object = (1, 2)
+    let value: object = {{value}}
     Console.WriteLine(describe(value))
 }
 """;
 
-        var tree = SyntaxTree.ParseText(code);
-        var references = TestMetadataReferences.Default;
-        var compilation = Compilation.Create("tuple_pattern_emit", new CompilationOptions(OutputKind.ConsoleApplication))
-            .AddSyntaxTrees(tree)
-            .AddReferences(references);
-
-        using var stream = new MemoryStream();
-        var result = compilation.Emit(stream);
-        var diagnosticMessage = string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.ToString()));
-        Assert.True(result.Success, diagnosticMessage);
+        Assert.Equal(expected, CompileAndRun(code, "tuple_pattern_emit"));
     }
 
-    [Fact(Skip = "Positional pattern codegen is currently unstable and tracked separately.")]
-    public void LetPositionalPatternAssignment_EmitsSuccessfully()
+    [Fact]
+    public void LetPositionalPatternAssignment_EmitsAndRuns()
     {
         const string code = """
 import System.*
@@ -56,20 +50,11 @@ func Main() {
 }
 """;
 
-        var tree = SyntaxTree.ParseText(code);
-        var references = TestMetadataReferences.Default;
-        var compilation = Compilation.Create("let_tuple_pattern_emit", new CompilationOptions(OutputKind.ConsoleApplication))
-            .AddSyntaxTrees(tree)
-            .AddReferences(references);
-
-        using var stream = new MemoryStream();
-        var result = compilation.Emit(stream);
-        var diagnosticMessage = string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.ToString()));
-        Assert.True(result.Success, diagnosticMessage);
+        Assert.Equal("1\n2", CompileAndRun(code, "let_tuple_pattern_emit"));
     }
 
-    [Fact(Skip = "Positional pattern codegen is currently unstable and tracked separately.")]
-    public void PositionalPatternAssignment_WithExistingLocals_EmitsSuccessfully()
+    [Fact]
+    public void PositionalPatternAssignment_WithExistingLocals_EmitsAndRuns()
     {
         const string code = """
 import System.*
@@ -82,20 +67,11 @@ func Main() {
 }
 """;
 
-        var tree = SyntaxTree.ParseText(code);
-        var references = TestMetadataReferences.Default;
-        var compilation = Compilation.Create("tuple_pattern_existing_locals", new CompilationOptions(OutputKind.ConsoleApplication))
-            .AddSyntaxTrees(tree)
-            .AddReferences(references);
-
-        using var stream = new MemoryStream();
-        var result = compilation.Emit(stream);
-        var diagnosticMessage = string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.ToString()));
-        Assert.True(result.Success, diagnosticMessage);
+        Assert.Equal("3", CompileAndRun(code, "tuple_pattern_existing_locals"));
     }
 
-    [Fact(Skip = "Positional pattern codegen is currently unstable and tracked separately.")]
-    public void VarPositionalPatternAssignment_EmitsSuccessfully()
+    [Fact]
+    public void VarPositionalPatternAssignment_EmitsAndRuns()
     {
         const string code = """
 import System.*
@@ -106,20 +82,11 @@ func Main() {
 }
 """;
 
-        var tree = SyntaxTree.ParseText(code);
-        var references = TestMetadataReferences.Default;
-        var compilation = Compilation.Create("tuple_pattern_var_assignment", new CompilationOptions(OutputKind.ConsoleApplication))
-            .AddSyntaxTrees(tree)
-            .AddReferences(references);
-
-        using var stream = new MemoryStream();
-        var result = compilation.Emit(stream);
-        var diagnosticMessage = string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.ToString()));
-        Assert.True(result.Success, diagnosticMessage);
+        Assert.Equal("3", CompileAndRun(code, "tuple_pattern_var_assignment"));
     }
 
-    [Fact(Skip = "Positional pattern codegen is currently unstable and tracked separately.")]
-    public void MixedPositionalPatternAssignment_EmitsSuccessfully()
+    [Fact]
+    public void MixedPositionalPatternAssignment_EmitsAndRuns()
     {
         const string code = """
 import System.*
@@ -132,15 +99,40 @@ func Main() {
 }
 """;
 
+        Assert.Equal("1\n3", CompileAndRun(code, "tuple_pattern_mixed_assignment"));
+    }
+
+    private static string CompileAndRun(string code, string assemblyName)
+    {
         var tree = SyntaxTree.ParseText(code);
         var references = TestMetadataReferences.Default;
-        var compilation = Compilation.Create("tuple_pattern_mixed_assignment", new CompilationOptions(OutputKind.ConsoleApplication))
+        var compilation = Compilation.Create(assemblyName, new CompilationOptions(OutputKind.ConsoleApplication))
             .AddSyntaxTrees(tree)
             .AddReferences(references);
 
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
-        var diagnosticMessage = string.Join(Environment.NewLine, result.Diagnostics.Select(d => d.ToString()));
-        Assert.True(result.Success, diagnosticMessage);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+
+        using var loaded = TestAssemblyLoader.LoadFromStream(stream, references);
+        var entryPoint = loaded.Assembly.EntryPoint;
+        Assert.NotNull(entryPoint);
+
+        using var writer = new StringWriter();
+        var originalOut = Console.Out;
+        try
+        {
+            Console.SetOut(writer);
+            var arguments = entryPoint!.GetParameters().Length == 0
+                ? null
+                : new object?[] { Array.Empty<string>() };
+            entryPoint.Invoke(null, arguments);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        return writer.ToString().ReplaceLineEndings("\n").TrimEnd('\n');
     }
 }
