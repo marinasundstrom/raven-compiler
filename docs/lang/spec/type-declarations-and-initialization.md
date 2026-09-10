@@ -315,6 +315,13 @@ class Widget {
 }
 ```
 
+An instance constructor in a class without an explicit base initializer calls
+the base type's parameterless constructor. This also applies to a primary
+constructor without a base argument list and to a synthesized default
+constructor. If the base type has no parameterless constructor, compilation
+reports an error; supply the required arguments using `init(...): base(...)`
+or a primary-constructor base argument list.
+
 ## Records
 
 Records provide value semantics and support three declaration forms:

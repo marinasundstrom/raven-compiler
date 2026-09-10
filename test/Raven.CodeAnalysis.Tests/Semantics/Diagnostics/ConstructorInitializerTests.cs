@@ -1,4 +1,9 @@
+using System.IO;
+using System.Linq;
+
+using Raven.CodeAnalysis.Syntax;
 using Raven.CodeAnalysis.Testing;
+using Raven.CodeAnalysis.Tests;
 
 using Xunit;
 
@@ -6,6 +11,43 @@ namespace Raven.CodeAnalysis.Semantics.Tests;
 
 public class ConstructorInitializerTests : DiagnosticTestBase
 {
+    [Theory]
+    [InlineData("class Derived : Base { init() {} }")]
+    [InlineData("class Derived() : Base {}")]
+    [InlineData("class Derived : Base {}")]
+    public void MissingImplicitBaseConstructor_ReportsDiagnosticAndPreventsEmit(string derivedDeclaration)
+    {
+        var tree = SyntaxTree.ParseText("open class Base { init(value: int) {} }\n" + derivedDeclaration);
+        var compilation = Compilation.Create("test", new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddSyntaxTrees(tree)
+            .AddReferences(TestMetadataReferences.Default);
+
+        var diagnostic = Assert.Single(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Equal("RAV1501", diagnostic.Id);
+        Assert.Contains("Base", diagnostic.GetMessage());
+        Assert.Equal(1, diagnostic.Location.GetLineSpan().StartLinePosition.Line);
+        Assert.Equal(diagnostic, Assert.Single(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)));
+
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.False(result.Success);
+        Assert.Contains(result.Diagnostics, d => d.Id == "RAV1501");
+        Assert.Equal(0, stream.Length);
+    }
+
+    [Fact]
+    public void PrimaryConstructor_WithInvalidExplicitBaseInitializer_ReportsOnlyExplicitCallError()
+    {
+        var tree = SyntaxTree.ParseText("open class Base { init(value: int) {} }\nclass Derived() : Base() {}");
+        var compilation = Compilation.Create("test", new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddSyntaxTrees(tree)
+            .AddReferences(TestMetadataReferences.Default);
+
+        var diagnostic = Assert.Single(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Equal("RAV1501", diagnostic.Id);
+        Assert.Equal("()", tree.GetText().ToString(diagnostic.Location.SourceSpan));
+    }
+
     [Fact]
     public void StaticConstructor_WithBaseInitializer_ReportsDiagnostic()
     {

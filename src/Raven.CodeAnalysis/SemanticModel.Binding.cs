@@ -6762,6 +6762,8 @@ public partial class SemanticModel
 
             if (primaryCtorBase is not null)
             {
+                constructorSymbol.MarkConstructorInitializerSyntax();
+
                 // Use a MethodBinder as the parent so that the primary constructor's
                 // parameters are in scope when binding the base argument list.
                 var methodBinder = new MethodBinder(constructorSymbol, classBinder);

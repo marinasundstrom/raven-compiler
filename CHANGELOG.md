@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Classes whose implicit base call has no parameterless constructor now report
+  a semantic error instead of crashing during emission. This includes explicit,
+  primary, and synthesized default constructors.
+
 - Referenced macro projects now prefer the selected compiler support assemblies
   over same-named package assets, preventing duplicate standard macro exports
   when repository and installed packages are both available.

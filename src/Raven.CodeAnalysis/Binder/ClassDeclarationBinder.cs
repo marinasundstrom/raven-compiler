@@ -64,6 +64,36 @@ internal sealed class ClassDeclarationBinder : TypeDeclarationBinder
         }
     }
 
+    public void ValidateImplicitBaseConstructors()
+    {
+        var type = ContainingSymbol;
+        if (type.IsStatic || type.IsValueType || type.BaseType is not { TypeKind: not TypeKind.Error } baseType)
+            return;
+
+        if (baseType.Constructors.Any(static constructor => !constructor.IsStatic && constructor.Parameters.Length == 0))
+            return;
+
+        foreach (var constructor in type.Constructors.OfType<SourceMethodSymbol>())
+        {
+            if (constructor.IsStatic || constructor.HasConstructorInitializerSyntax || constructor.ConstructorInitializer is not null)
+                continue;
+
+            // Synthesized record copy constructors call the base copy constructor.
+            if (type is SourceNamedTypeSymbol { IsRecord: true } && constructor.Parameters.Length == 1 &&
+                SymbolEqualityComparer.Default.Equals(constructor.Parameters[0].Type, type))
+            {
+                continue;
+            }
+
+            var declaration = constructor.GetDeclaringTypeSyntax();
+            if (declaration?.SyntaxTree != Syntax.SyntaxTree || declaration.Span != Syntax.Span)
+                continue;
+
+            _diagnostics.ReportNoOverloadForMethod(
+                "constructor for type", baseType.Name, 0, constructor.Locations[0]);
+        }
+    }
+
     private void EnsureStaticConstructorIfNeeded(INamedTypeSymbol named, TypeDeclarationSyntax typeSyntax)
     {
         bool needsStaticCtor = named.GetMembers()

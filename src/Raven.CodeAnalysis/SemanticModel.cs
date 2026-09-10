@@ -1010,6 +1010,9 @@ public partial class SemanticModel
 
                 Traverse(child, childBinder);
             }
+
+            if (node is TypeDeclarationSyntax && currentBinder is ClassDeclarationBinder classBinder)
+                classBinder.ValidateImplicitBaseConstructors();
         }
 
         void BindFunctionBody(FunctionStatementSyntax function, FunctionBinder functionBinder)
