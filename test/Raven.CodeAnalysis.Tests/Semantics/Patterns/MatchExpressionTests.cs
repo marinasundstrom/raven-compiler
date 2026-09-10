@@ -419,8 +419,10 @@ func Describe(value: unit) -> string {
     public void MatchExpression_WithNullLiteralPatternOnNullExpression_IsExhaustive()
     {
         const string code = """
-let description = match null {
-    null => "Null"
+func Describe() -> string {
+    return match null {
+        null => "Null"
+    }
 }
 """;
 
