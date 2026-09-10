@@ -716,6 +716,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -761,6 +762,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -805,6 +807,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -874,6 +877,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -940,6 +944,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -1932,6 +1937,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -2171,6 +2177,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -2223,6 +2230,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -2273,6 +2281,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -2325,6 +2334,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -2379,6 +2389,7 @@ public sealed class ProjectFileNuGetReferenceTests
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <AssemblyName>App</AssemblyName>
+                <OutputType>Exe</OutputType>
               </PropertyGroup>
               <ItemGroup>
                 <FrameworkReference Include="Microsoft.AspNetCore.App" />
