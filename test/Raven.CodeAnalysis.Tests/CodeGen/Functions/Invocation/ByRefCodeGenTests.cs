@@ -10,15 +10,18 @@ namespace Raven.CodeAnalysis.Tests;
 
 public class ByRefCodeGenTests
 {
-    [Fact]
-    public void ByRefLocal_AssignmentWritesThrough()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ByRefLocal_AssignmentWritesThrough(bool explicitType)
     {
-        const string code = """
+        var code = $$"""
 class C {
     static func WriteThrough() -> int {
         var value = 1
-        let handle: &int = &value
-        handle = 5
+        let handle{{(explicitType ? ": &int" : "")}} = &value
+        value = 3
+        handle = *handle + 2
         value
     }
 }
@@ -46,18 +49,21 @@ class C {
         Assert.Equal(5, value);
     }
 
-    [Fact]
-    public void ByRefParameter_AssignmentThroughAliasMutatesSource()
+    [Theory]
+    [InlineData("slot: &int", "&value")]
+    [InlineData("ref slot: int", "&value")]
+    [InlineData("ref slot: int", "ref value")]
+    public void ByRefParameter_AssignmentThroughAliasMutatesSource(string parameter, string argument)
     {
-        const string code = """
+        var code = $$"""
 class Buffer {
-    static func Write(var slot: &int, value: int) -> unit {
-        slot = value
+    static func Write({{parameter}}, value: int) -> unit {
+        slot = slot + value
     }
 
     static func Run() -> int {
         var value = 10
-        Write(&value, 42)
+        Write({{argument}}, 32)
         value
     }
 }
@@ -84,4 +90,44 @@ class Buffer {
         var value = (int)method!.Invoke(null, Array.Empty<object>())!;
         Assert.Equal(42, value);
     }
+
+    [Theory]
+    [InlineData("int", "10", "32", "32:10")]
+    [InlineData("string", "\"first\"", "\"second\"", "second:first")]
+    public void GenericByRefParameters_ForwardAndSwapValues(string typeName, string first, string second, string expected)
+    {
+        var code = $$"""
+class Buffer {
+    static func Swap<T>(ref left: T, ref right: T) -> () {
+        let original = left
+        left = right
+        right = original
+    }
+
+    static func Forward<T>(ref left: T, ref right: T) -> () {
+        Swap(ref left, ref right)
+    }
+
+    static func Run() -> string {
+        var first: {{typeName}} = {{first}}
+        var second: {{typeName}} = {{second}}
+        Forward(ref first, ref second)
+        return first.ToString() + ":" + second.ToString()
+    }
+}
+""";
+        var references = TestMetadataReferences.Default;
+        var compilation = Compilation.Create("byref-swap", new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddSyntaxTrees(SyntaxTree.ParseText(code))
+            .AddReferences(references);
+
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+
+        using var loaded = TestAssemblyLoader.LoadFromStream(stream, references);
+        var method = loaded.Assembly.GetType("Buffer", throwOnError: true)!.GetMethod("Run")!;
+        Assert.Equal(expected, method.Invoke(null, null));
+    }
+
 }

@@ -618,11 +618,7 @@ internal partial class ExpressionGenerator : Generator
                 if (TryEmitCapturedVariableLoad(parameterAccess.Parameter))
                     return EmitInfo.None;
 
-                int position = MethodGenerator.GetParameterBuilder(parameterAccess.Parameter).Position;
-                if (MethodSymbol.IsStatic)
-                    position -= 1;
-
-                ILGenerator.Emit(OpCodes.Ldarga_S, (short)position);
+                EmitParameterForByRefUse(parameterAccess.Parameter);
                 return EmitInfo.ForAddress(parameterAccess.Parameter);
 
             case BoundSelfExpression when !MethodSymbol.IsStatic && MethodSymbol.ContainingType?.IsValueType == true:
@@ -2266,6 +2262,8 @@ internal partial class ExpressionGenerator : Generator
             position -= 1;
 
         ILGenerator.Emit(OpCodes.Ldarg, position);
+        if (parameterAccess.Parameter.IsByRefParameter)
+            EmitLoadIndirect(parameterAccess.Parameter.GetByRefElementType());
         return EmitInfo.ForValue(parameterAccess.Parameter);
     }
 
@@ -5461,7 +5459,7 @@ internal partial class ExpressionGenerator : Generator
         var needsBox = rightExpression.Type is { IsValueType: true }
             && resultType?.SpecialType == SpecialType.System_Object;
 
-        EmitExpression(reference);
+        EmitExpression(reference, emitAddress: reference is BoundParameterAccess);
         EmitRequiredValue(rightExpression);
 
         IILocal? tempLocal = null;

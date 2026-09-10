@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Reading a by-reference parameter now loads the referenced value rather than
+  its address. Writes and forwarded calls preserve the caller's storage, including
+  generic swaps of value and reference types.
+
 - Async error propagation with `use` now preserves suspension and disposes
   resources before returning a propagated failure. Both carrier `?` and
   `try? await` expose their early returns before async state-machine lowering.

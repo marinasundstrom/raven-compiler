@@ -206,7 +206,10 @@ their parameter types are written as plain `Type`, not `&Type`. For
 example, write `ref value: int`, not `ref value: &int`. When a
 by-reference parameter is passed **into** a function, it behaves just
 like a by-reference local: the callee receives an alias to the caller's
-storage and can both read and write through that reference. To mark a
+storage and can both read and write through that reference. Reading a parameter
+in a value expression loads the stored value; passing it onward by reference
+preserves the original storage location. These rules also apply to generic
+by-reference parameters. To mark a
 parameter that must be assigned by the callee before returning, place
 `out` before the parameter name. `ref` and `out` parameters are writable
 aliases; `in` parameters are read-only. At call sites, pass the argument with
