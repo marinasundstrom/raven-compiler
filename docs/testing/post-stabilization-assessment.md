@@ -76,5 +76,8 @@ isolated runtime suite (861 executions), standalone/project sample runs, the
 cross-target matrix, and Release sample IL verification. The full project build
 has one MAUI platform-toolchain blocker (Xcode 26.6 is required). Subsequent
 slices fix provider-based C# unions and ordinary constructed generic closed-family
-matching, with focused metadata and reloaded-runtime regressions; the passing
-gates do not establish universal C#/.NET 11 compatibility or bootstrap readiness.
+matching, with focused metadata and reloaded-runtime regressions. Both fixes
+also pass a fresh full baseline (5,458 executions) and isolated runtime suite
+(861 executions) at revision `27340ef4e`, with zero failures or skips. The earlier
+sample, matrix, and IL gates retain their original revision provenance; these
+results do not establish universal C#/.NET 11 compatibility or bootstrap readiness.

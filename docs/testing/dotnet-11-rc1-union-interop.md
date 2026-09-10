@@ -13,6 +13,10 @@ Commit `59d354cc7` fixes missing sealed-interface metadata and emits loadable
 names for hoisted generic cases. Production-code qualification below uses
 `59d354cc7` unless a different revision is stated.
 
+Commit `f2178021d` fixes constructed generic base types for imported closed
+families. Commit `27340ef4e` adds C# `IUnionMembers` provider consumption;
+their qualification is described below.
+
 | Feature | .NET 10 target | .NET 11 target |
 | --- | --- | --- |
 | Union marker and `IUnion` | Raven.Core compatibility contracts | Framework contracts |
@@ -127,14 +131,13 @@ The runtime suite includes all four new Minimal API/OpenAPI cases, covering
 runtime and generated request delegates separately. Execution totals count
 bounded test runs, not necessarily distinct test identities.
 
-The full project build cannot be called green: RC 1 reports NETSDK1147 for
+That full project build was not green: RC 1 reported NETSDK1147 for
 `wasm-tools-net10` on `macro-maui/host/MauiCounter.Host.csproj`. A separate
-Mac Catalyst-only probe also reports the missing `maccatalyst` workload.
-`dotnet workload list` for this SDK lists no installed workloads. No sample was
-removed or reclassified to hide the failure. Xcode remains 26.2, but this pass
+Mac Catalyst-only probe also reported the missing `maccatalyst` workload.
+`dotnet workload list` for this SDK listed no installed workloads. No sample was
+removed or reclassified to hide the failure. Xcode was 26.2, but this pass
 stopped at workload resolution, before rechecking the previous Xcode 26.6
-requirement. Restore the RC 1 workloads and rerun the complete host build before
-claiming MAUI qualification.
+requirement. The workload recheck below supersedes this environment finding.
 
 On 2026-09-11, after installation of the RC 1 MAUI workload, a focused
 rebuild of the same complete MAUI host progressed past workload resolution.
@@ -157,8 +160,8 @@ tag, or release publication was performed.
 ## Generic closed-hierarchy qualification
 
 C# generic closed roots import their closed marker and direct generic case
-names correctly; this is now covered in `CSharpUnionInteropTests`. However,
-constructed-family matching is still a compatibility gap. This RC 1 fixture:
+names correctly; this is covered in `CSharpUnionInteropTests`. Constructed-family
+matching initially exposed a compatibility gap with this RC 1 fixture:
 
 ```csharp
 public closed record GenericEvent<T>;
@@ -230,6 +233,27 @@ The focused union/runtime/completion filter passes 260 checks, including provide
 variants with and without `HasValue`. Ordinary constructor-based unions remain
 covered. No new Raven syntax or TextMate rule is needed: symbol import and
 existing semantic APIs expose the provider contract to language services.
+
+## Regression qualification after the interop fixes
+
+On 2026-09-11, both full test scripts completed against clean production revision
+`27340ef4e`, using SDK `11.0.100-rc.1.26425.128`. Compiler and test sources
+remained unchanged throughout these runs.
+
+| Gate | Result |
+| --- | --- |
+| `scripts/test-baseline.sh` | 5,458 passing executions; zero failures or skips |
+| `scripts/test-runtime-isolated.sh` | 861 passing executions; zero failures or skips |
+
+These runs cover the generic closed-family and provider-union fixes together,
+including the existing .NET 10 Core checks and isolated ASP.NET Core interop
+tests. The focused provider filter additionally passed 260 executions, followed
+by all three C# interoperability cases after the final factory-shape tightening.
+Counts describe executions rather than distinct tests across overlapping runs.
+
+The standalone samples, cross-target matrix, and Release IL results above remain
+qualification of revision `1e989cf84`; they were not rerun for this revision.
+The MAUI workload recheck still leaves the Xcode 26.6 requirement unresolved.
 
 ## References
 
