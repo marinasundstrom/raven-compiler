@@ -13,6 +13,15 @@ The expression before `()` is the call target. It may be a named function, a
 method, a function-valued expression, a type being constructed, or a value whose
 type defines an invocation operator.
 
+## Generic overload specificity
+
+When generic overloads have equivalent constructed parameter types, ignoring
+nullable reference annotations, Raven compares their declared parameter shapes.
+A concrete type shape is more specific than a type parameter; the comparison
+also applies inside matching generic types and arrays. For example,
+`Func<Task<T>>` is more specific than `Func<T>` when both accept a
+`Func<Task<int>>` argument. Explicit type arguments still constrain selection.
+
 ## Optional arguments
 
 When the target has optional parameters, omitted trailing arguments are filled

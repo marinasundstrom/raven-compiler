@@ -32,6 +32,46 @@ public sealed class ClassifyConversionTests : CompilationTestBase
         Assert.False(conversion.IsUserDefined);
     }
 
+    [Theory]
+    [InlineData("System.Func`1", SpecialType.System_String, SpecialType.System_Object, true)]
+    [InlineData("System.Func`1", SpecialType.System_Object, SpecialType.System_String, false)]
+    [InlineData("System.Action`1", SpecialType.System_Object, SpecialType.System_String, true)]
+    [InlineData("System.Action`1", SpecialType.System_String, SpecialType.System_Object, false)]
+    [InlineData("System.Func`1", SpecialType.System_Int32, SpecialType.System_Object, false)]
+    [InlineData("System.Action`1", SpecialType.System_Object, SpecialType.System_Int32, false)]
+    public void DelegateVariance_RequiresReferenceConversion(
+        string metadataName, SpecialType sourceArgument, SpecialType targetArgument, bool expected)
+    {
+        var compilation = CreateCompilation();
+        var definition = Assert.IsAssignableFrom<INamedTypeSymbol>(compilation.GetTypeByMetadataName(metadataName));
+        var source = definition.Construct(compilation.GetSpecialType(sourceArgument));
+        var target = definition.Construct(compilation.GetSpecialType(targetArgument));
+
+        var conversion = compilation.ClassifyConversion(source, target);
+
+        Assert.Equal(expected, conversion.Exists && conversion.IsImplicit);
+        if (expected)
+            Assert.True(conversion.IsReference);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void DelegateCovariance_AllowsNullableReturnWideningOnly(bool reverse, bool expected)
+    {
+        var compilation = CreateCompilation();
+        var definition = Assert.IsAssignableFrom<INamedTypeSymbol>(compilation.GetTypeByMetadataName("System.Func`1"));
+        var text = compilation.GetSpecialType(SpecialType.System_String);
+        var nonNullable = definition.Construct(text);
+        var nullable = definition.Construct(text.GetNullableType());
+
+        var conversion = reverse
+            ? compilation.ClassifyConversion(nullable, nonNullable)
+            : compilation.ClassifyConversion(nonNullable, nullable);
+
+        Assert.Equal(expected, conversion.Exists && conversion.IsImplicit);
+    }
+
     [Fact]
     public void Null_ConvertsToNullableReference()
     {

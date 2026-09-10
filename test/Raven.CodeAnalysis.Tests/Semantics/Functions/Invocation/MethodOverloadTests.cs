@@ -12,6 +12,32 @@ namespace Raven.CodeAnalysis.Semantics.Tests;
 
 public class MethodOverloadTests : CompilationTestBase
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericDelegateOverloads_PreferNestedParameterShape_RegardlessOfDeclarationOrder(bool reverse)
+    {
+        const string general = "static func Choose<T>(handler: Func<T>) -> int => 1";
+        const string nested = "static func Choose<T>(handler: Func<Task<T>?>) -> int => 2";
+        var source = $$"""
+import System.*
+import System.Threading.Tasks.*
+
+class Runner {
+    {{(reverse ? nested : general)}}
+    {{(reverse ? general : nested)}}
+}
+let handler = () => Task.FromResult(42)
+let result = Runner.Choose(handler)
+""";
+        var (compilation, tree) = CreateCompilation(source);
+        Assert.Empty(compilation.GetDiagnostics());
+        var invocation = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Single(node => node.Expression.ToString() == "Runner.Choose");
+        var method = Assert.IsAssignableFrom<IMethodSymbol>(compilation.GetSemanticModel(tree).GetSymbolInfo(invocation).Symbol);
+        Assert.Equal(SpecialType.System_Int32, Assert.Single(method.TypeArguments).SpecialType);
+    }
+
     [Fact]
     public void CollectionLiteralArgument_UsesArrayTargetWhenOverloadsDisagree()
     {

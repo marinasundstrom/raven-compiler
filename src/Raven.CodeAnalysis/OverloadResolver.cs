@@ -1952,6 +1952,17 @@ internal sealed class OverloadResolver
         if (candidateHasParams != currentHasParams)
             return !candidateHasParams;
 
+        // Nullable reference annotations do not distinguish otherwise identical
+        // constructed signatures. Compare the original generic parameter shapes
+        // so M<T>(Func<Task<T>>) wins over M<T>(Func<T>) for Func<Task<int>>.
+        if (candidate.IsGenericMethod && current.IsGenericMethod &&
+            HaveEquivalentParameterTypes(candParams, currentParams, SymbolEqualityComparer.IgnoringNullability))
+        {
+            var specificity = CompareGenericParameterSpecificity(candidate, current);
+            if (specificity != 0)
+                return specificity > 0;
+        }
+
         if (candidateIsExtension && currentIsExtension && receiver?.Type is ITypeSymbol receiverType)
         {
             var candParamType = candParams[0].Type;
@@ -2160,21 +2171,59 @@ internal sealed class OverloadResolver
 
     private static bool HaveEquivalentParameterTypes(
         ImmutableArray<IParameterSymbol> left,
-        ImmutableArray<IParameterSymbol> right)
+        ImmutableArray<IParameterSymbol> right,
+        SymbolEqualityComparer? comparer = null)
     {
+        comparer ??= SymbolEqualityComparer.Default;
         if (left.Length != right.Length)
             return false;
 
         for (var i = 0; i < left.Length; i++)
         {
             if (left[i].RefKind != right[i].RefKind ||
-                !SymbolEqualityComparer.Default.Equals(left[i].Type, right[i].Type))
+                !comparer.Equals(left[i].Type, right[i].Type))
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private static int CompareGenericParameterSpecificity(IMethodSymbol candidate, IMethodSymbol current)
+    {
+        var candidateParameters = candidate.OriginalDefinition.Parameters;
+        var currentParameters = current.OriginalDefinition.Parameters;
+        var candidateBetter = false;
+        var currentBetter = false;
+        for (var i = 0; i < candidateParameters.Length; i++)
+            Compare(candidateParameters[i].Type, currentParameters[i].Type);
+
+        return candidateBetter == currentBetter ? 0 : candidateBetter ? 1 : -1;
+
+        void Compare(ITypeSymbol left, ITypeSymbol right)
+        {
+            if (left is NullableTypeSymbol { UnderlyingType.IsValueType: false } leftNullable)
+                left = leftNullable.UnderlyingType;
+            if (right is NullableTypeSymbol { UnderlyingType.IsValueType: false } rightNullable)
+                right = rightNullable.UnderlyingType;
+            if (left is ITypeParameterSymbol || right is ITypeParameterSymbol)
+            {
+                candidateBetter |= left is not ITypeParameterSymbol;
+                currentBetter |= right is not ITypeParameterSymbol;
+            }
+            else if (left is IArrayTypeSymbol leftArray && right is IArrayTypeSymbol rightArray &&
+                     leftArray.Rank == rightArray.Rank)
+            {
+                Compare(leftArray.ElementType, rightArray.ElementType);
+            }
+            else if (left is INamedTypeSymbol leftNamed && right is INamedTypeSymbol rightNamed &&
+                     leftNamed.OriginalDefinition.MetadataIdentityEquals(rightNamed.OriginalDefinition))
+            {
+                for (var i = 0; i < leftNamed.TypeArguments.Length; i++)
+                    Compare(leftNamed.TypeArguments[i], rightNamed.TypeArguments[i]);
+            }
+        }
     }
 
     private static int GetTaskDepth(ITypeSymbol? type)
@@ -2863,6 +2912,12 @@ internal sealed class OverloadResolver
             var conversionScore = IsImplicitSpanConversion(compilation, argType, parameter.Type)
                 ? 2
                 : GetConversionScore(conversion);
+
+            if (argType.TypeKind == TypeKind.Delegate && parameter.Type.TypeKind == TypeKind.Delegate &&
+                SymbolEqualityComparer.IgnoringNullability.Equals(argType, parameter.Type))
+            {
+                conversionScore = 0;
+            }
 
             if (parameter.Type is NullableTypeSymbol nullableParam && !Conversion.IsNullable(argType))
             {

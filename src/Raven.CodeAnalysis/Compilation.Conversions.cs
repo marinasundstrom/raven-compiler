@@ -1591,6 +1591,32 @@ public partial class Compilation
         if (source.MetadataIdentityEquals(destination))
             return false;
 
+        if (source is INamedTypeSymbol { TypeKind: TypeKind.Delegate } sourceDelegate &&
+            destination is INamedTypeSymbol { TypeKind: TypeKind.Delegate } destinationDelegate &&
+            sourceDelegate.OriginalDefinition is INamedTypeSymbol delegateDefinition &&
+            delegateDefinition.MetadataIdentityEquals(destinationDelegate.OriginalDefinition))
+        {
+            var parameters = delegateDefinition.TypeParameters;
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                var from = sourceDelegate.TypeArguments[i];
+                var to = destinationDelegate.TypeArguments[i];
+                if (SymbolEqualityComparer.Default.Equals(from, to))
+                    continue;
+
+                if (parameters[i].Variance == VarianceKind.None || from.IsValueType || to.IsValueType)
+                    return false;
+
+                var conversion = parameters[i].Variance == VarianceKind.Out
+                    ? ClassifyConversion(from, to, includeUserDefined: false)
+                    : ClassifyConversion(to, from, includeUserDefined: false);
+                if (!conversion.IsImplicit || !(conversion.IsIdentity || conversion.IsReference))
+                    return false;
+            }
+
+            return true;
+        }
+
         var current = source.BaseType;
         while (current is not null)
         {

@@ -83,6 +83,11 @@ Keep compiler and editor-adjacent coverage in the project that owns the behavior
 
 When a language-server failure exposes a compiler semantic bug, reduce it into `Raven.CodeAnalysis.Tests` first, then keep a narrow `Raven.LanguageServer.Tests` guard only for the language-server path that made the bug visible.
 
+Nested async lambda capture coverage is active in
+`AsyncFunctionExpressionStateMachineTests`, including direct invocation and
+`Task.Run` of a stored delegate. Run it with
+`dotnet test test/Raven.CodeAnalysis.Tests/Raven.CodeAnalysis.Tests.csproj --filter 'FullyQualifiedName~.AsyncFunctionExpressionStateMachineTests.' /property:WarningLevel=0`.
+
 Current explicit gaps:
 
 | Area | Gap | Preferred cleanup |

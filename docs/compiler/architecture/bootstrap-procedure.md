@@ -194,7 +194,6 @@ resolved or explicitly excluded from the compiler-writing subset:
 
 | Area | Current evidence | Required disposition |
 | --- | --- | --- |
-| Nested async lambdas with captures | Runtime test is skipped pending current async lowering | Reproduce, fix or define exclusion, and add observable runtime coverage |
 | Async resource lifetime across `await` | Legacy test is skipped pending replacement | Add current semantic/runtime coverage before relying on `use` in async compiler code |
 
 The C# compiler source also identifies the following high-value translation

@@ -393,6 +393,13 @@ class Counter {
 Here, `increment` continues to invoke `Increment` on the same `Counter`
 instance.
 
+## Delegate conversions
+
+Values of the same generic delegate type follow its declared variance: return
+values may widen covariantly and parameters may narrow contravariantly through
+implicit reference conversions. Nullable reference widening is supported;
+boxing and unsafe nullable narrowing do not make a variant conversion valid.
+
 ## Captured values
 
 Local functions and function expressions can capture locals, parameters, and

@@ -85,11 +85,13 @@ public sealed class AsyncFunctionExpressionStateMachineTests(ITestOutputHelper o
             "IL verification failed for top-level async Main with lambda parameter plus real outer capture.");
     }
 
-    [Fact(Skip = "Legacy nested async lambda codegen shape; pending rewrite for current async lowering.")]
-    public void Nested_async_lambda_with_capture_executes_and_returns_value()
+    [Theory]
+    [InlineData("run()")]
+    [InlineData("Task.Run(run)")]
+    public void Nested_async_lambda_with_capture_executes_and_returns_value(string invocation)
     {
         var output = CompileAndRun(
-            """
+            $$"""
             import System.Console.*
             import System.Threading.Tasks.*
 
@@ -103,7 +105,7 @@ public sealed class AsyncFunctionExpressionStateMachineTests(ITestOutputHelper o
                 return await inner()
             }
 
-            let result = await Task.Run(run)
+            let result = await {{invocation}}
             WriteLine(result)
             """
         );

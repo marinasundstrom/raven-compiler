@@ -6,6 +6,10 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
 
 ### Fixed
 
+- Async delegate variables passed to `Task.Run` now select the payload-returning
+  overload instead of unnecessarily nesting tasks. Delegate variance supports
+  safe reference and nullable-return conversions, and equivalent generic
+  signatures prefer the more specific declared parameter shape.
 - List sequence-pattern captures now select the `IEnumerable<T>` constructor
   when materializing a slice, avoiding invalid captured lists when the capacity
   constructor appears first in metadata.

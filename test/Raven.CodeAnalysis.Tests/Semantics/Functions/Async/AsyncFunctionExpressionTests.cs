@@ -273,6 +273,35 @@ let result = await Task.Run(async () => {
         Assert.Equal(SpecialType.System_Int32, resultLocal.Type.SpecialType);
     }
 
+    [Theory]
+    [InlineData("Task.Run(run)", "int")]
+    [InlineData("Task.Run<Task<int>>(run)", "Task<int>")]
+    public void AsyncDelegateLocal_PassedToTaskRun_AwaitsSelectedOverloadPayload(string invocation, string expectedType)
+    {
+        var source = $$"""
+import System.Threading.Tasks.*
+
+let offset = 2
+let run = async () => {
+    let inner = async () => {
+        await Task.Delay(1)
+        return 40 + offset
+    }
+    return await inner()
+}
+let result = await {{invocation}}
+""";
+
+        var (compilation, tree) = CreateCompilation(source, options: new CompilationOptions(OutputKind.ConsoleApplication));
+        Assert.Empty(compilation.GetDiagnostics());
+        var model = compilation.GetSemanticModel(tree);
+        var resultDeclarator = tree.GetRoot().DescendantNodes()
+            .OfType<VariableDeclaratorSyntax>()
+            .Single(declarator => declarator.Identifier.ValueText == "result");
+        var resultLocal = Assert.IsAssignableFrom<ILocalSymbol>(model.GetDeclaredSymbol(resultDeclarator));
+        Assert.Equal(expectedType, resultLocal.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+    }
+
     [Fact]
     public void AsyncFuncExpression_WithBlockBody_BindsAndInfersTaskResult()
     {
