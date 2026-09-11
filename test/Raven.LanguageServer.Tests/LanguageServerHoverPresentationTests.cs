@@ -570,7 +570,7 @@ func Main() {
                 "test",
                 [syntaxTree],
                 [.. LanguageServerTestReferences.Default],
-                new CompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                new CompilationOptions(OutputKind.ConsoleApplication))
             .AddMacroReferences(new MacroReference(new TypedObjectMacro()));
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
         compilation.GetDiagnostics()
@@ -1857,7 +1857,7 @@ let found = values.TryGetValue("answer")
             "test",
             [syntaxTree],
             references,
-            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new CompilationOptions(OutputKind.ConsoleApplication));
         compilation.GetDiagnostics()
             .Where(diagnostic => diagnostic.Severity == Raven.CodeAnalysis.DiagnosticSeverity.Error)
             .ShouldBeEmpty();
