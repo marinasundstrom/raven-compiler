@@ -1,8 +1,7 @@
 # Learn Raven
 
 There is one recommended path into Raven. It begins with a small program,
-continues through the language's main ideas, and introduces the source-built
-toolchain only when you are ready to execute code.
+continues through the language's main ideas, and introduces the downloadable SDK when you are ready to run code.
 
 ## Start here
 
@@ -10,8 +9,7 @@ toolchain only when you are ready to execute code.
    program and the ideas that matter most.
 2. Continue with the [language introduction](introduction.md) for functions,
    data modeling, patterns, failure handling, objects, and .NET interop.
-3. Follow [Install and run Raven](getting-started.md) when you want to build the
-   compiler, run a file, and create a project.
+3. Follow [Install and run Raven](getting-started.md) to install the SDK, run a file, and create a project without a source checkout.
 
 Afterward, the [language feature guides](lang/features/index.md) provide short,
 focused explanations, while the [domain-modeling guide](lang/domain-modeling.md)

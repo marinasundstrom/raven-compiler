@@ -67,7 +67,8 @@
           "compiler/analyzers/built-in.md",
           "compiler/analyzers/configuration.md",
           "compiler/raven-vscode-extension.md",
-          "compiler/distribution.md"
+          "compiler/distribution.md",
+          "status.md"
         ],
         "exclude": []
       }

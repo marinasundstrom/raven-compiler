@@ -18,7 +18,21 @@ Start with:
 - [Analyzer configuration](analyzers/configuration.md)
 - [JSON serialization](json-serialization.md)
 
-Project extensions are covered from a user and library-author perspective.
-Compiler APIs, architecture, implementation notes, and contributor workflows
-remain in the repository's development documentation rather than the public
-user manual.
+## Compiler services
+
+`Raven.CodeAnalysis` exposes syntax trees, symbols, semantic models, and
+compilation APIs. These services power diagnostics and editor features, and
+can also be used by tools that inspect Raven programs.
+
+- [Built-in analyzers](analyzers/built-in.md) and [analyzer configuration](analyzers/configuration.md)
+  explain the analysis available in ordinary projects.
+- [Source generators](source-generators.md) and [project extensions](extending-projects.md)
+  cover extending compilation.
+- [Compiler architecture](https://github.com/marinasundstrom/raven/blob/main/docs/compiler/architecture/live-semantic-model.md)
+  describes syntax and semantic services for tool authors.
+- [Compiler source and APIs](https://github.com/marinasundstrom/raven/tree/main/src/Raven.CodeAnalysis)
+  provide the implementation and public API definitions.
+
+Compiler APIs are in preview and may change between releases. For source
+builds and contributions, use the
+[contributor guide](https://github.com/marinasundstrom/raven/blob/main/CONTRIBUTING.md).

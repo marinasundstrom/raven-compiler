@@ -68,6 +68,8 @@
       items:
         - name: Overview
           href: overview.md
+        - name: Release status and compatibility
+          href: status.md
         - name: MVP roadmap
           href: roadmap.md
     - name: Language reference
