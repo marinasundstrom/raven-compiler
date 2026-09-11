@@ -6,7 +6,16 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-11**.
 
 ### Breaking changes
 
-- None recorded.
+- Removed `try? expression`. Use `(try expression)?` to capture exceptions and
+  propagate one carrier layer. If the operand already returns a compatible
+  carrier, propagate that layer explicitly with `((try expression)?)?`.
+- `TryExpressionSyntax` no longer exposes `QuestionToken`; syntax factories
+  and update methods accept only the `try` keyword and operand.
+
+### Fixed
+
+- Propagation from inside an exception-protected expression now preserves its
+  early return value, including explicit propagation through nested results.
 
 ## 0.1.11 - 2026-09-11
 

@@ -2135,16 +2135,10 @@ internal partial class ExpressionGenerator : Generator
 
         if (TryGetExceptionExitLabel(out var exitLabel))
         {
-            if (MethodBodyGenerator.TryGetReturnValueLocal(out var returnValueLocal) && returnValueLocal is not null)
-            {
-                ILGenerator.Emit(OpCodes.Stloc, returnValueLocal);
-            }
-            else
-            {
-                var spillLocal = ILGenerator.DeclareLocal(resultClrType);
-                ILGenerator.Emit(OpCodes.Stloc, spillLocal);
-            }
-
+            // The epilogue must read this value even when this is the first return
+            // emitted inside a protected region. A temporary spill is not a return slot.
+            var returnValueLocal = MethodBodyGenerator.EnsureReturnValueLocal();
+            ILGenerator.Emit(OpCodes.Stloc, returnValueLocal);
             ILGenerator.Emit(OpCodes.Leave, exitLabel);
             return;
         }

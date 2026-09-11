@@ -7989,22 +7989,8 @@ public partial class SemanticModel
             return false;
         }
 
-        var resultType = resultDefinition.Construct(expressionType, exceptionType);
-        if (tryExpression.QuestionToken.Kind == SyntaxKind.None)
-        {
-            type = resultType;
-            return true;
-        }
-
-        if (resultType is not INamedTypeSymbol resultNamedType)
-            return false;
-
-        var resultPayloadType = TryGetAvailableCarrierPayloadType(resultNamedType);
-        if (resultPayloadType is null || resultPayloadType.TypeKind == TypeKind.Error)
-            return false;
-
-        type = TypeSymbolNormalization.NormalizeForInference(resultPayloadType);
-        return type.TypeKind != TypeKind.Error;
+        type = resultDefinition.Construct(expressionType, exceptionType);
+        return true;
     }
 
     private bool TryGetEnclosingParameterTypeFromSyntax(

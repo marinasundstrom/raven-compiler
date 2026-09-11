@@ -20,11 +20,11 @@ carrier conversion.
 
 ## Carrier operators
 
-The spec groups `try`, `try?`, `?`, and carrier `?.` together because they all
+The spec groups `try`, `(try expression)?`, `?`, and carrier `?.` together because they all
 describe how Raven moves values through `Result<T, E>` and `Option<T>`:
 
 * `try` captures exceptions into `Result<T, Exception>`.
-* `try?` captures and then propagates.
+* `(try expression)?` captures and then propagates.
 * `?` unwraps a success value or propagates the non-success case.
 * Carrier `?.` maps a member access over the success case without unwrapping the
   carrier itself.

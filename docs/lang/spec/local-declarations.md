@@ -314,7 +314,7 @@ until the scope exits, including by return, exception, or cancellation. An async
 function completes its task only after the required cleanup has finished. These
 rules also apply to resources acquired after an earlier await. Early returns
 introduced by carrier propagation (`?`) or exception capture and propagation
-(`try?`) perform the same cleanup as an explicit return.
+(`(try expression)?`) perform the same cleanup as an explicit return.
 
 When you need a narrower lifetime than the enclosing block, Raven also supports
 an explicit nested-scope form:

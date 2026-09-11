@@ -213,7 +213,6 @@ Use `disable`/`restore` without IDs to suppress or restore all diagnostics. `dis
 | `RAV1905` | Error | Label not allowed here | Labels are not valid in expressions; use a statement block instead | — |
 | `RAV1906` | Error | Nested try expression | Nested try expressions are not allowed | — |
 | `RAV1907` | Error | Throw statement not allowed here | Throw statements are not valid in expressions; use a statement block instead | `samples/control-flow/throw-expression-basic.rav`, `samples/control-flow/try-catch-basic.rav` |
-| `RAV1908` | Error | Match expression not allowed | Match expressions are not allowed after a try? expression | — |
 | `RAV1909` | Error | By-reference return cannot reference local storage | Cannot return a by-reference value that points to local '{localName}' | — |
 | `RAV1910` | Error | By-reference return cannot reference value parameter storage | Cannot return a by-reference value that points to value parameter '{parameterName}' | `samples/unmanaged/pointers.rav`, `samples/unmanaged/test.rav` |
 | `RAV1911` | Error | Pointer type requires unsafe | Pointer types require unsafe mode ('--unsafe'). | `samples/unmanaged/pointers.rav`, `samples/unmanaged/test.rav` |
@@ -228,6 +227,7 @@ Use `disable`/`restore` without IDs to suppress or restore all diagnostics. `dis
 | `RAV1915` | Error | Extern members must be static | Member '{memberName}' cannot be marked 'extern' unless it is static | `samples/unmanaged/pointers.rav`, `samples/unmanaged/test.rav` |
 | `RAV1916` | Error | Extern member cannot have a body | '{memberName}' cannot declare a body because it is marked extern | `samples/unmanaged/pointers.rav`, `samples/unmanaged/test.rav` |
 | `RAV1917` | Warning | Unsafe mode is enabled | Unsafe mode is enabled | `samples/unmanaged/pointers.rav`, `samples/unmanaged/test.rav` |
+| `RAV1925` | Error | Removed try propagation syntax | The 'try?' syntax is no longer supported; use '(try expression)?' and propagate each carrier layer explicitly | — |
 | `RAV1955` | Error | Non-invocable member | Non-invocable member '{memberName}' cannot be used like a method | — |
 | `RAV2001` | Error | Numeric literal out of range | The numeric literal is out of range for its target type | — |
 | `RAV2002` | Error | Unterminated character literal | Unterminated character literal | — |

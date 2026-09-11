@@ -167,52 +167,43 @@ let value = try int.Parse("foo")
     }
 
     [Fact]
-    public void TryExpression_WithQuestionMark_PayloadType_IsCurrentlyUnresolved()
+    public void ParenthesizedTryPropagation_HasPayloadType()
     {
         var code = """
-func ParseFlag(text: string) -> Result<bool, string> {
-    let flag = try? bool.Parse(text)
+import System.*
+
+func ParseFlag(text: string) -> Result<bool, Exception> {
+    let flag = (try System.Convert.ToBoolean(text))?
     return .Ok(flag)
 }
 """;
 
-        var verifier = CreateVerifier(code);
-        var result = verifier.GetResult();
-
-        var tree = result.Compilation.SyntaxTrees.Single();
-        var model = result.Compilation.GetSemanticModel(tree);
+        var tree = SyntaxTree.ParseText(code);
+        var compilation = Compilation.Create("try-propagation", [tree],
+            [.. TestMetadataReferences.Default, MetadataReference.CreateFromFile(
+                System.IO.Path.Combine(System.AppContext.BaseDirectory, "Raven.Core.dll"))],
+            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(), d => d.Severity == DiagnosticSeverity.Error);
+        var model = compilation.GetSemanticModel(tree);
         var local = tree.GetRoot()
             .DescendantNodes()
             .OfType<VariableDeclaratorSyntax>()
             .Single(node => node.Identifier.Text == "flag");
 
         var localSymbol = Assert.IsAssignableFrom<ILocalSymbol>(model.GetDeclaredSymbol(local));
-        Assert.Equal(SpecialType.None, localSymbol.Type.SpecialType);
+        Assert.Equal(SpecialType.System_Boolean, localSymbol.Type.SpecialType);
     }
 
-    [Fact]
-    public void TryExpression_WithQuestionMark_DisallowsMatch()
+    [Theory]
+    [InlineData("let value = try? Compute()")]
+    [InlineData("let value = try ? Compute()")]
+    [InlineData("let value = try? Compute() match { _ => 1 }")]
+    public void RemovedTryQuestionSyntax_ReportsMigrationDiagnosticAndPreservesText(string source)
     {
-        var code = """
-func ParseFlag(text: string) -> Result<bool, string> {
-    let flag = try? bool.Parse(text) match {
-        true => true
-        false => false
-    }
-
-    return .Ok(flag)
-}
-""";
-
-        var tree = SyntaxTree.ParseText(code);
-        var compilation = Compilation.Create(
-            "try_question_mark_disallows_match",
-            [tree],
-            TestMetadataReferences.Default,
-            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        var diagnostics = compilation.GetDiagnostics();
-        Assert.Contains(diagnostics, d => d.Descriptor.Id == "RAV1908");
+        var tree = SyntaxTree.ParseText(source);
+        Assert.Contains(tree.GetDiagnostics(), diagnostic => diagnostic.Id == "RAV1925");
+        Assert.Equal(source, tree.GetRoot().ToFullString());
+        Assert.Single(tree.GetRoot().DescendantNodes().OfType<TryExpressionSyntax>());
     }
 
     [Fact]
@@ -282,7 +273,7 @@ class C {
     }
 
     [Fact]
-    public void TryExpression_WithAwaitAndQuestionMark_LocalType_IsCurrentlyUnresolved()
+    public void ParenthesizedTryAwaitPropagation_HasPayloadType()
     {
         var code = """
 import System.*
@@ -290,24 +281,26 @@ import System.Threading.Tasks.*
 
 class C {
     async func Work() -> Task<Result<int, Exception>> {
-        let value = try? await Task.FromResult(1)
+        let value = (try await Task.FromResult(1))?
         return .Ok(value)
     }
 }
 """;
 
-        var verifier = CreateVerifier(code);
-        var result = verifier.GetResult();
-
-        var tree = result.Compilation.SyntaxTrees.Single();
-        var model = result.Compilation.GetSemanticModel(tree);
+        var tree = SyntaxTree.ParseText(code);
+        var compilation = Compilation.Create("try-propagation", [tree],
+            [.. TestMetadataReferences.Default, MetadataReference.CreateFromFile(
+                System.IO.Path.Combine(System.AppContext.BaseDirectory, "Raven.Core.dll"))],
+            new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(compilation.GetDiagnostics(), d => d.Severity == DiagnosticSeverity.Error);
+        var model = compilation.GetSemanticModel(tree);
         var declarator = tree.GetRoot()
             .DescendantNodes()
             .OfType<VariableDeclaratorSyntax>()
             .Single(node => node.Identifier.Text == "value");
 
         var local = Assert.IsAssignableFrom<ILocalSymbol>(model.GetDeclaredSymbol(declarator));
-        Assert.Equal(SpecialType.None, local.Type.SpecialType);
+        Assert.Equal(SpecialType.System_Int32, local.Type.SpecialType);
     }
 
 }

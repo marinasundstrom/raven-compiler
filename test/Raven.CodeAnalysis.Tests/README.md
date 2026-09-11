@@ -94,7 +94,7 @@ in `AsyncTryAwaitCodeGenTests`, using a controlled incomplete
 task to verify disposal before completion and reverse cleanup order for return,
 exceptions, and cancellation. It also replaces the return-type-only disposal
 check by verifying `?` carrier propagation and
-`try? await` exception capture across suspension, including success payloads,
+`(try await expression)?` exception capture across suspension, including success payloads,
 error payloads, skipped continuation code, and resource cleanup. Run this slice with
 `dotnet test test/Raven.CodeAnalysis.Tests/Raven.CodeAnalysis.Tests.csproj --filter 'FullyQualifiedName~.AsyncResourceLifetimeCodeGenTests.' /property:WarningLevel=0`.
 

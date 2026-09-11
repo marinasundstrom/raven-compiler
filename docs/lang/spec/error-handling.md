@@ -90,6 +90,6 @@ whose guard succeeds handles the exception. A bare `catch` is equivalent to
 ## Capturing exceptions as values
 
 Use `try expression` to capture a throwing API as `Result<T, Exception>`, or
-`try? expression` to capture and immediately propagate the failure through an
+`(try expression)?` to capture and immediately propagate the failure through an
 enclosing carrier. The complete rules and diagnostics are in [Error propagation
 and carrier types](async-and-error-propagation.md#try-expressions).

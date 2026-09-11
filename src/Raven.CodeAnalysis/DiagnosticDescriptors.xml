@@ -834,10 +834,6 @@
   <Descriptor Id="RAV1906" Identifier="TryExpressionCannotBeNested" Title="Nested try expression"
     Message="Nested try expressions are not allowed" Category="compiler" Severity="Error"
     EnabledByDefault="true" Description="" HelpLinkUri="" />
-  <Descriptor Id="RAV1908" Identifier="TryPropagationCannotUseMatch"
-    Title="Match expression not allowed"
-    Message="Match expressions are not allowed after a try? expression" Category="compiler"
-    Severity="Error" EnabledByDefault="true" Description="" HelpLinkUri="" />
   <Descriptor Id="RAV1909" Identifier="ByRefReturnCannotReferenceLocal"
     Title="By-reference return cannot reference local storage"
     Message="Cannot return a by-reference value that points to local '{localName}'"
@@ -901,6 +897,10 @@
     Title="Extern member cannot have a body"
     Message="'{memberName}' cannot declare a body because it is marked extern" Category="compiler"
     Severity="Error" EnabledByDefault="true" Description="" HelpLinkUri="" />
+  <Descriptor Id="RAV1925" Identifier="TryPropagationSyntaxRemoved"
+    Title="Removed try propagation syntax"
+    Message="The 'try?' syntax is no longer supported; use '(try expression)?' and propagate each carrier layer explicitly"
+    Category="compiler" Severity="Error" EnabledByDefault="true" Description="" HelpLinkUri="" />
   <Descriptor Id="RAV1955" Identifier="NonInvocableMember" Title="Non-invocable member"
     Message="Non-invocable member '{memberName}' cannot be used like a method" Category="compiler"
     Severity="Error" EnabledByDefault="true" Description="" HelpLinkUri="" />

@@ -25,7 +25,7 @@ import System.Threading.Tasks.*
 
 class Program {
     static async func Fetch() -> Task<Result<int, Exception>> {
-        let value = try? await Task.FromResult(42)
+        let value = (try await Task.FromResult(42))?
         return .Ok(value)
     }
 
@@ -62,11 +62,11 @@ class Program {
         use stream = MemoryStream()
 
         if shouldThrow {
-            let value = try? await Program.ThrowingAsync()
+            let value = (try await Program.ThrowingAsync())?
             return .Ok(value)
         }
 
-        let okValue = try? await Task.FromResult(7)
+        let okValue = (try await Task.FromResult(7))?
         return .Ok(okValue)
     }
 
@@ -112,7 +112,7 @@ class Program {
     }
 
     static async func Test(throwExc: bool) -> Task<Result<int, Exception>> {
-        let x = try? await Program.Action(throwExc)
+        let x = ((try await Program.Action(throwExc))?)?
         return .Ok(x + 2)
     }
 
@@ -204,7 +204,7 @@ class Program {
     }
 
     static async func FetchTextLength() -> Task<Result<int, Exception>> {
-        let payload = try? await Program.FetchPayload()
+        let payload = ((try await Program.FetchPayload())?)?
         await Task.Delay(1)
         return .Ok(payload.Text.Length)
     }

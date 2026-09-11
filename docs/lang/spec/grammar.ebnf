@@ -738,7 +738,7 @@ NameOfOperand            ::= Identifier
                            | MemberBindingExpression
                            | QualifiedName ;
 
-TryExpression            ::= 'try' ['?'] Expression ;
+TryExpression            ::= 'try' Expression ;
 UnsafeExpression         ::= 'unsafe' Block ;
 ReturnExpression         ::= 'return' Expression ;
 ThrowExpression          ::= 'throw' Expression ;

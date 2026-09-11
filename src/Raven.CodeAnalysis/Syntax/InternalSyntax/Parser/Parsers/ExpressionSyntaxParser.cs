@@ -817,11 +817,15 @@ internal partial class ExpressionSyntaxParser : SyntaxParser
     private TryExpressionSyntax ParseTryExpression()
     {
         var tryKeyword = ReadToken();
-        var questionToken = ConsumeToken(SyntaxKind.QuestionToken, out var consumedQuestionToken)
-            ? consumedQuestionToken
-            : Token(SyntaxKind.None);
+        if (ConsumeToken(SyntaxKind.QuestionToken, out var removedQuestionToken))
+        {
+            AddDiagnostic(DiagnosticInfo.Create(CompilerDiagnostics.TryPropagationSyntaxRemoved, GetSpanOfLastToken()));
+            tryKeyword = tryKeyword.WithTrailingTrivia(tryKeyword.TrailingTrivia.Concat([
+                new SyntaxTrivia(new SkippedTokensTrivia(new SyntaxList([removedQuestionToken])))
+            ]));
+        }
         var expression = new ExpressionSyntaxParser(this, allowMatchExpressionSuffixes: false).ParseExpression();
-        return TryExpression(tryKeyword, questionToken, expression);
+        return TryExpression(tryKeyword, expression);
     }
 
     private ReturnExpressionSyntax ParseReturnExpression()
@@ -2903,9 +2907,7 @@ internal partial class ExpressionSyntaxParser : SyntaxParser
     {
         while (PeekToken().IsKind(SyntaxKind.MatchKeyword) && !HasLeadingNewLine(PeekToken()))
         {
-            var disallowTryPropagationMatch = expression is TryExpressionSyntax tryExpression &&
-                                             tryExpression.QuestionToken.Kind != SyntaxKind.None;
-            expression = ParsePostfixMatchExpression(expression, disallowTryPropagationMatch);
+            expression = ParsePostfixMatchExpression(expression);
         }
 
         return expression;
@@ -2916,29 +2918,19 @@ internal partial class ExpressionSyntaxParser : SyntaxParser
         var matchKeyword = ExpectToken(SyntaxKind.MatchKeyword);
         var scrutinee = new ExpressionSyntaxParser(this, allowMatchExpressionSuffixes: false, stopOnOpenBrace: true).ParseExpression();
 
-        var disallowTryPropagationMatch = scrutinee is TryExpressionSyntax tryExpression &&
-                                          tryExpression.QuestionToken.Kind != SyntaxKind.None;
-
-        var (openBraceToken, arms, closeBraceToken) = ParseMatchExpressionBody(disallowTryPropagationMatch);
+        var (openBraceToken, arms, closeBraceToken) = ParseMatchExpressionBody();
         return MatchExpression(matchKeyword, scrutinee, openBraceToken, arms, closeBraceToken);
     }
 
-    private PostfixMatchExpressionSyntax ParsePostfixMatchExpression(ExpressionSyntax scrutinee, bool disallowTryPropagationMatch)
+    private PostfixMatchExpressionSyntax ParsePostfixMatchExpression(ExpressionSyntax scrutinee)
     {
         var matchKeyword = ReadToken();
-        var (openBraceToken, arms, closeBraceToken) = ParseMatchExpressionBody(disallowTryPropagationMatch);
+        var (openBraceToken, arms, closeBraceToken) = ParseMatchExpressionBody();
         return PostfixMatchExpression(scrutinee, matchKeyword, openBraceToken, arms, closeBraceToken);
     }
 
-    private (SyntaxToken OpenBraceToken, SyntaxList Arms, SyntaxToken CloseBraceToken) ParseMatchExpressionBody(
-        bool disallowTryPropagationMatch)
+    private (SyntaxToken OpenBraceToken, SyntaxList Arms, SyntaxToken CloseBraceToken) ParseMatchExpressionBody()
     {
-        if (disallowTryPropagationMatch)
-        {
-            AddDiagnostic(DiagnosticInfo.Create(
-                CompilerDiagnostics.TryPropagationCannotUseMatch,
-                GetSpanOfLastToken()));
-        }
 
         ConsumeTokenOrMissing(SyntaxKind.OpenBraceToken, out var openBraceToken);
 

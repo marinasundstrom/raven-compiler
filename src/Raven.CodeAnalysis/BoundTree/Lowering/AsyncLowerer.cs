@@ -2469,9 +2469,8 @@ internal static class AsyncLowerer
                     expression = blockValueExpression;
                 }
 
-                // If the try-expression already produces the enclosing Result type (common for `try? await ...` where
-                // the awaited expression returns Result<TOk, TErr>), do NOT wrap it in an Ok-case. Just pass it through.
-                // We still need the try/catch here to convert *thrown* exceptions (from await) into the Error-case.
+                // Preserve a lowered expression that already has the target Result type.
+                // The try/catch still converts thrown exceptions into the Error case.
                 var expressionType = expression.Type ?? compilation.ErrorTypeSymbol;
 
                 BoundExpression convertedExpression;

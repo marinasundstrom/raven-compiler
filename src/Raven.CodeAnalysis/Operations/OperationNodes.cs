@@ -1219,12 +1219,6 @@ internal sealed class ConditionalAccessOperation : Operation, IConditionalAccess
     private IOperation? CreateOperationForBoundExpression(BoundExpression expression)
     {
         var syntax = SemanticModel.GetSyntax(expression) ?? Syntax;
-        if (_bound is BoundCarrierConditionalAccessExpression && expression is BoundTryExpression tryExpression && Syntax is TryExpressionSyntax trySyntax)
-        {
-            // Preserve the semantic nesting for `try?`: conditional access over a try-expression receiver.
-            return new TryExpressionOperation(SemanticModel, tryExpression, trySyntax, isImplicit: true);
-        }
-
         return OperationFactory.Create(SemanticModel, syntax, expression);
     }
 }

@@ -700,7 +700,6 @@
   </Node>
   <Node Name="TryExpression" Inherits="Expression">
     <Slot Name="TryKeyword" Type="Token" DefaultToken="TryKeyword" />
-    <Slot Name="QuestionToken" Type="Token" IsOptionalToken="true" />
     <Slot Name="Expression" Type="Expression" />
   </Node>
   <Node Name="ReturnExpression" Inherits="Expression">

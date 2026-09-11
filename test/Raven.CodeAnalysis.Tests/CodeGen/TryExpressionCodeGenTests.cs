@@ -21,7 +21,7 @@ import System.*
 
 class Runner {
     static func Import(text: string) -> Result<int, Exception> {
-        let value = try? Convert.ToInt32(text)
+        let value = (try Convert.ToInt32(text))?
         return .Ok(value)
     }
 
@@ -65,7 +65,7 @@ import System.Threading.Tasks.*
 
 class Runner {
     static async func Test(throwExc: bool) -> Task<Result<int, Exception>> {
-        let x = try? await Action2(throwExc)
+        let x = ((try await Action2(throwExc))?)?
         return .Ok(x + 2)
     }
 
@@ -148,6 +148,52 @@ class Runner {
         using var loaded = TestAssemblyLoader.LoadFromStream(stream, references);
         var run = loaded.Assembly.GetType("Example.Runner")!.GetMethod("Run")!;
         Assert.Equal(0, run.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData(0, "value:42", "value:42")]
+    [InlineData(1, "handled:returned", "error:returned")]
+    [InlineData(2, "error:thrown", "error:thrown")]
+    public void ExplicitPropagation_PreservesOrPropagatesInnerFailure(int mode, string preserved, string flattened)
+    {
+        const string code = """
+import System.*
+class Runner {
+    static func Read(mode: int) -> Result<int, Exception> {
+        if mode == 1 { return .Error(Exception("returned")) }
+        if mode == 2 { throw Exception("thrown") }
+        return .Ok(42)
+    }
+    static func Preserve(mode: int) -> Result<string, Exception> {
+        let inner = (try Read(mode))?
+        return .Ok(inner match {
+            .Ok(let value) => "value:" + value.ToString()
+            .Error(let error) => "handled:" + error.Message
+        })
+    }
+    static func Flatten(mode: int) -> Result<string, Exception> {
+        let value = ((try Read(mode))?)?
+        return .Ok("value:" + value.ToString())
+    }
+    static func Run(mode: int, flatten: bool) -> string {
+        let result = if flatten { Flatten(mode) } else { Preserve(mode) }
+        return result match {
+            .Ok(let text) => text
+            .Error(let error) => "error:" + error.Message
+        }
+    }
+}
+""";
+        var references = GetReferencesWithRavenCore();
+        var compilation = Compilation.Create("explicit-try-propagation", [SyntaxTree.ParseText(code)],
+            references, new CompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitted = compilation.Emit(stream);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        using var loaded = TestAssemblyLoader.LoadFromStream(stream, references);
+        var run = loaded.Assembly.GetType("Runner")!.GetMethod("Run")!;
+        Assert.Equal(preserved, run.Invoke(null, [mode, false]));
+        Assert.Equal(flattened, run.Invoke(null, [mode, true]));
     }
 
     private static MetadataReference[] GetReferencesWithRavenCore()

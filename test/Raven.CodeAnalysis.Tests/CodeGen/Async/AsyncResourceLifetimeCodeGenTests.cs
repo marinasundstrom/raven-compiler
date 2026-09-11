@@ -150,7 +150,7 @@ class Program {
         trace.Add("entered")
         use first = Probe("first", trace)
         use second = Probe("second", trace)
-        {{(captureException ? "let value = try? await gate" : "let value = MakeResult(await gate, fail)?")}}
+        {{(captureException ? "let value = (try await gate)?" : "let value = MakeResult(await gate, fail)?")}}
         trace.Add("continued")
         return .Ok(value)
     }
