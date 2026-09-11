@@ -248,7 +248,51 @@ const initializeDocumentationNavigation = () => {
   content.insertBefore(details, content.querySelector('article'))
 }
 
+const initializeReferenceFinder = () => {
+  const finder = document.querySelector('[data-reference-finder]')
+  if (!finder) return
+  const input = finder.querySelector('input')
+  const clear = finder.querySelector('[data-reference-clear]')
+  const status = finder.querySelector('[data-reference-count]')
+  const empty = document.querySelector('[data-reference-empty]')
+  const shortcuts = document.querySelector('[data-reference-shortcuts]')
+  const groups = [...document.querySelectorAll('.raven-reference-group')]
+  const topics = [...document.querySelectorAll('[data-reference-topic]')].map((element) => ({
+    element,
+    text: `${element.textContent} ${element.dataset.keywords} ${element.closest('section').querySelector('h2').textContent}`.toLowerCase()
+  }))
+  const filter = () => {
+    const terms = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    let visible = 0
+    topics.forEach(({ element, text }) => {
+      element.hidden = !terms.every((term) => text.includes(term))
+      if (!element.hidden) visible++
+    })
+    groups.forEach((group) => {
+      group.hidden = !group.querySelector('[data-reference-topic]:not([hidden])')
+    })
+    empty.hidden = visible !== 0
+    if (shortcuts) shortcuts.hidden = terms.length > 0
+    clear.disabled = input.value.length === 0
+    status.textContent = terms.length ? `${visible} of ${topics.length} topics match.` : `${topics.length} reference topics. Filter by name, keyword, or syntax.`
+    const url = new URL(window.location.href)
+    if (input.value.trim()) url.searchParams.set('q', input.value.trim())
+    else url.searchParams.delete('q')
+    window.history.replaceState(null, '', url)
+  }
+  input.value = new URL(window.location.href).searchParams.get('q') ?? ''
+  input.addEventListener('input', filter)
+  clear.addEventListener('click', () => {
+    input.value = ''
+    filter()
+    input.focus()
+  })
+  filter()
+  finder.hidden = false
+}
+
 const initializeRavenSite = () => {
+  initializeReferenceFinder()
   initializeDocumentationNavigation()
   initializeCarousels()
   initializePlaygroundSamples()

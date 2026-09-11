@@ -709,3 +709,47 @@ body > main > .content > .raven-doc-navigation { display: block; padding: 1rem 0
   .raven-hero { padding: 2rem 0; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* Reference lookup: direct destinations, familiar names, and local filtering. */
+.raven-reference-finder {
+    margin: 1.5rem 0;
+    padding: 1.2rem;
+    border: 1px solid var(--raven-line);
+    border-radius: .8rem;
+    background: var(--raven-surface);
+}
+.raven-reference-finder label { display: block; font-weight: 700; margin-bottom: .6rem; }
+.raven-reference-search { display: flex; gap: .6rem; }
+.raven-reference-search input {
+    flex: 1;
+    min-width: 0;
+    padding: .7rem;
+    border: 1px solid var(--raven-line);
+    border-radius: .4rem;
+    background: var(--raven-bg);
+    color: var(--raven-ink);
+    font: inherit;
+}
+.raven-reference-search button {
+    padding: .6rem .8rem;
+    border: 1px solid var(--raven-line);
+    border-radius: .4rem;
+    background: var(--raven-accent-soft);
+    color: var(--raven-ink);
+    font: inherit;
+}
+.raven-reference-search button:disabled { opacity: .5; }
+.raven-reference-search :focus-visible { outline: 2px solid var(--raven-accent); outline-offset: 3px; }
+.raven-reference-finder [role="status"] { margin: .75rem 0 0; font-size: .9rem; color: var(--raven-muted); }
+.raven-reference-topics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; margin-top: 2rem; }
+.raven-reference-group h2 { margin-top: 0; font-size: 1.35rem; line-height: 1.3; }
+.raven-reference-group ul { padding: 0; list-style: none; }
+.raven-reference-group li { margin: 0; padding: .8rem 0; border-bottom: 1px solid var(--raven-line); }
+.raven-reference-group a { font-weight: 650; }
+.raven-reference-group p { margin: .3rem 0 0; color: var(--raven-muted); font-size: .95rem; line-height: 1.5; }
+.raven-reference-empty { padding: 1rem; border-left: 3px solid var(--raven-accent); }
+body:not(:has(.raven-hero)) article:has(.raven-reference-topics) { max-width: none; }
+body[data-layout]:not([data-search]):has(.raven-reference-topics) > main > .affix { display: none; }
+@media (max-width: 767.98px) {
+    .raven-reference-topics { grid-template-columns: 1fr; gap: 1.5rem; }
+}
