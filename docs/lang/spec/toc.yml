@@ -1,124 +1,173 @@
-- name: Language reference
+- name: Find a reference topic
   href: index.md
 
-- name: Language fundamentals
+- name: Values and types
   items:
-    - name: Lexical structure
-      href: lexical-structure.md
-    - name: Values, expressions, and statements
-      href: values-and-statements.md
-    - name: Namespaces, imports, and aliases
-      href: namespaces-and-imports.md
-    - name: Top-level code and entry points
-      href: top-level-code-and-entry-points.md
-    - name: Grammar (non-normative EBNF)
-      href: grammar.md
 
-- name: Types
-  items:
-    - name: Type system
+    - name: "Variables and constants: let, var, const"
+      href: local-declarations.md
+
+    - name: "Types, generics, and conversions"
       href: type-system.md
-    - name: Unions
-      href: unions.md
-    - name: Enum declarations
-      href: enum-declarations.md
-    - name: Delegate declarations
-      href: delegate-declarations.md
 
-- name: Expressions
-  items:
-    - name: Expressions and type inference
-      href: expressions-and-inference.md
-    - name: Literals and fundamental expressions
+    - name: "Nullable types and suppression: T? and !"
+      href: type-system.md#nullable-types
+
+    - name: "Literals, tuples, and basic expressions"
       href: fundamental-expressions.md
-    - name: Collection expressions
+
+    - name: "Collections and spread"
       href: collection-expressions.md
-    - name: Calls
-      href: invocations.md
-    - name: Pipe expressions
-      href: pipe-expressions.md
-    - name: Object creation and copying
-      href: object-creation.md
-    - name: Operators
+
+    - name: "Expressions and type inference"
+      href: expressions-and-inference.md
+
+    - name: "Operators, precedence, and ranges"
       href: operators.md
 
-- name: Declarations and members
+- name: Functions and calls
   items:
-    - name: Local declarations
-      href: local-declarations.md
-    - name: Functions
+
+    - name: "Functions: func"
       href: functions.md
-    - name: Async functions
-      href: async-functions.md
-    - name: Classes, structs, and interfaces
-      href: classes-and-members.md
-    - name: Type declarations and initialization
-      href: type-declarations-and-initialization.md
-    - name: Properties and events
-      href: properties-and-events.md
-    - name: Inheritance and partial types
-      href: inheritance-and-partial-types.md
-    - name: Parameters, overloading, and operators
+
+    - name: "Lambdas and function values"
+      href: functions.md#function-expressions
+
+    - name: "Calls and arguments"
+      href: invocations.md
+
+    - name: "Parameters, overloads, and custom operators"
       href: parameters-overloading-and-operators.md
-    - name: Interfaces
+
+    - name: "Delegates"
+      href: delegate-declarations.md
+
+    - name: "Pipes"
+      href: pipe-expressions.md
+
+- name: Data models and members
+  items:
+
+    - name: "Classes, structs, and members"
+      href: classes-and-members.md
+
+    - name: "Declarations, constructors, and access"
+      href: type-declarations-and-initialization.md
+
+    - name: "Records"
+      href: type-declarations-and-initialization.md#records
+
+    - name: "Unions"
+      href: unions.md
+
+    - name: "Enums"
+      href: enum-declarations.md
+
+    - name: "Interfaces"
       href: interfaces.md
-    - name: Extension members
+
+    - name: "Properties, indexers, and events"
+      href: properties-and-events.md
+
+    - name: "Inheritance, sealed hierarchies, and partial types"
+      href: inheritance-and-partial-types.md
+
+    - name: "Extension members"
       href: extensions.md
 
-- name: Pattern matching
+    - name: "Object creation and copying"
+      href: object-creation.md
+
+- name: Patterns and matching
   items:
-    - name: Pattern matching overview
+
+    - name: "Pattern matching overview"
       href: pattern-matching.md
-    - name: Match forms
+
+    - name: "Match expressions and statements"
       href: match-forms.md
-    - name: Fundamental patterns
+
+    - name: "Binding, type, and comparison patterns"
       href: fundamental-patterns.md
-    - name: Sequence and property patterns
+
+    - name: "Sequence and property patterns"
       href: sequence-and-property-patterns.md
-    - name: Deconstruction, member, and union patterns
+
+    - name: "Deconstruction and union-case patterns"
       href: deconstruction-and-union-patterns.md
-    - name: Dictionary patterns
+
+    - name: "Dictionary patterns"
       href: dictionary-patterns.md
-    - name: Match exhaustiveness
+
+    - name: "Exhaustiveness"
       href: match-exhaustiveness.md
 
-- name: Control flow
+- name: Control flow, async, and errors
   items:
-    - name: Control flow overview
+
+    - name: "Control flow overview"
       href: control-flow.md
-    - name: Statements
-      href: assignment-and-expression-statements.md
-    - name: Conditionals and loops
+
+    - name: "Conditionals and loops: if, for, while"
       href: control-flow-expressions.md
-    - name: Return and yield
+
+    - name: "Assignments and expression statements"
+      href: assignment-and-expression-statements.md
+
+    - name: "Return and yield"
       href: returns-and-yield.md
-    - name: Jumps and labels
+
+    - name: "Break, continue, and labels"
       href: jumps-and-labels.md
 
-- name: Error handling
-  items:
-    - name: Exceptions and structured handling
+    - name: "Async and await"
+      href: async-functions.md
+
+    - name: "Exceptions: try, catch, finally"
       href: error-handling.md
-    - name: Error propagation and carrier types
+
+    - name: "Option, Result, and propagation: ?"
       href: async-and-error-propagation.md
 
-- name: Metaprogramming
+- name: Files and syntax
   items:
-    - name: Macros
+
+    - name: "Source text, keywords, and comments"
+      href: lexical-structure.md
+
+    - name: "Values, expressions, and statements"
+      href: values-and-statements.md
+
+    - name: "Namespaces and imports"
+      href: namespaces-and-imports.md
+
+    - name: "Top-level code and Main"
+      href: top-level-code-and-entry-points.md
+
+    - name: "Grammar"
+      href: grammar.md
+
+- name: Macros
+  items:
+
+    - name: "Macros and compile-time syntax"
       href: macros.md
 
-- name: Systems programming
+- name: Memory and .NET interop
   items:
-    - name: Systems programming and memory efficiency
+
+    - name: "Systems programming overview"
       href: systems-programming.md
-    - name: Spans and stack allocation
+
+    - name: "Spans and stack allocation"
       href: spans-and-memory.md
-    - name: Ref structs and ref safety
+
+    - name: "Ref structs and ref safety"
       href: ref-structs-and-ref-safety.md
-    - name: Unsafe code
+
+    - name: "Unsafe code and native interop"
       href: unsafe-code-and-interop.md
 
-- name: .NET interoperability
-  items:
-    - name: .NET implementation notes
+    - name: ".NET representation and compatibility"
       href: dotnet-implementation.md
