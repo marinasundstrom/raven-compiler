@@ -145,7 +145,13 @@ The active workload set is `11.0.100-rc.1.26460.1`, with MAUI
 `11.0.0-rc.1.26451.6`. Mac Catalyst now reports the previously observed Xcode
 requirement: pack `26.5.10318` requires Xcode 26.6, while the machine has
 Xcode 26.2. The historical missing-workload result above is superseded by
-this platform-toolchain blocker; the project gate is still not fully green.
+this platform-toolchain blocker; that full build did not pass.
+
+MAUI host qualification is deferred by project-owner decision on 2026-09-11.
+Compiling the complete host is outside the current qualification scope and does
+not block the remaining work. The results above remain historical evidence,
+not a passing MAUI build; no further workload or Xcode remediation is required
+for this milestone.
 
 Detailed generated sample reports are stored at
 `samples/output/net10.0/build-report.tsv`,
@@ -253,7 +259,8 @@ Counts describe executions rather than distinct tests across overlapping runs.
 
 The standalone samples, cross-target matrix, and Release IL results above remain
 qualification of revision `1e989cf84`; they were not rerun for this revision.
-The MAUI workload recheck still leaves the Xcode 26.6 requirement unresolved.
+The MAUI host is deferred as described above and is not a current qualification
+blocker.
 
 ## References
 

@@ -21,7 +21,7 @@ a reachable compiler defect; the constructor issue below was reproduced.
 | P0 — completed | Diagnose invalid implicit base constructor calls before emission | At the starting revision, `open class Base { init(value: int) {} } class Derived : Base { init() {} }` succeeds with `rvnc --output-type classlib --no-emit`, then crashes during emission with `Base type requires a parameterless constructor`. Add compiler diagnostics and focused coverage for explicit, primary, and synthesized derived constructors; keep valid base calls working. |
 | P1 — completed | Keep the supported-feature statement accurate | The analyzer guide still described macro-fragment usage as unsupported, although `UnusedVariableAnalyzer` resolves fragment references and `UnusedLocalAnalyzerTests` covers them. The operations status also listed an intentionally unwrapped nullable helper as a missing public operation. Correct these stale descriptions in this assessment slice. |
 | P1 — headless tiers completed | Qualify editor behavior on project-backed workloads | The completed baseline/runtime passes do not qualify the opt-in LSP integration and performance tiers. Select representative project-backed hover, completion, diagnostics, and repeated-edit scenarios from the test impact map. Fix any compiler semantic discrepancies at the compiler API boundary. |
-| P1 — executed; MAUI environment blocked | Execute candidate release gates with recorded provenance | Run the sample build/run workflows, target-framework matrix, and IL checks in the release gate document. Record exact revision, SDK, target frameworks, outcomes, and reviewed exemptions. Existing project sample compilation is not proof that every sample runs correctly. |
+| P1 — executed; MAUI deferred | Execute candidate release gates with recorded provenance | Run the sample build/run workflows, target-framework matrix, and IL checks in the release gate document. Record exact revision, SDK, target frameworks, outcomes, and reviewed exemptions. MAUI host qualification is deferred by project-owner decision. Existing project sample compilation is not proof that every sample runs correctly. |
 | P2 | Select and validate a small set of end-to-end workloads | Use the roadmap's CLI, domain, web, and mixed Raven/C# candidates. Demonstrate clean setup, build, run, and test with a concise support/limitations statement. This supplies evidence for release qualification rather than expanding language scope. |
 | P2 | Freeze bootstrap artifacts only after qualification | Follow ADR 0002: qualify the compiler foundation first, then record artifacts, checksums, provenance, and the immutable foundation tag. No foundation version is assumed qualified by these test results. |
 
@@ -73,8 +73,9 @@ The subsequent [.NET 11 RC 1 interoperability assessment](dotnet-11-rc1-union-in
 records native closed-class metadata, standard-union JSON alignment, preserved
 .NET 10 targeting, and the intentional closed-interface difference. It now also records a completed clean RC 1 baseline (5,457 executions),
 isolated runtime suite (861 executions), standalone/project sample runs, the
-cross-target matrix, and Release sample IL verification. The full project build
-has one MAUI platform-toolchain blocker (Xcode 26.6 is required). Subsequent
+cross-target matrix, and Release sample IL verification. The MAUI host did not
+fully build because of its platform toolchain; its qualification is deferred by
+project-owner decision on 2026-09-11 and does not block current work. Subsequent
 slices fix provider-based C# unions and ordinary constructed generic closed-family
 matching, with focused metadata and reloaded-runtime regressions. Both fixes
 also pass a fresh full baseline (5,458 executions) and isolated runtime suite
