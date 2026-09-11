@@ -3,7 +3,7 @@ import System.Console.*
 import System.Net.Http.*
 import System.Threading.Tasks.*
 
-// Feature: async propagation (`try?`) with HTTP operations.
+// Feature: async propagation (`(try expression)?`) with HTTP operations.
 let res = await fetch("http://www.contoso.com/")
 
 let str = match res {
@@ -15,8 +15,8 @@ WriteLine(str)
 
 async func fetch(url: string) -> Task<Result<string, Exception>> {
     use client = HttpClient()
-    use response = try? await client.GetAsync(url)
-    _ = try? response.EnsureSuccessStatusCode()
-    let responseBody = try? await response.Content.ReadAsStringAsync()
+    use response = (try await client.GetAsync(url))?
+    _ = (try response.EnsureSuccessStatusCode())?
+    let responseBody = (try await response.Content.ReadAsStringAsync())?
     return Ok(responseBody)
 }

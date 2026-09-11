@@ -15,7 +15,7 @@ WriteLine(str)
 
 async func fetch(url: string) -> Task<Result<string, Exception>> {
     use client = HttpClient()
-    let response = try? await client.GetAsync(url)
+    let response = (try await client.GetAsync(url))?
     let responseBody = await response.Content.ReadAsStringAsync()
     return Ok(responseBody)
 }

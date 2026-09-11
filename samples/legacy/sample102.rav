@@ -7,7 +7,7 @@ let res4_2 = await test4(throwExc: false)
 WriteLine(res4_2)
 
 async func test4(throwExc: bool) -> Task<Result<int, Exception>> {
-    let x = try? await action2(throwExc)
+    let x = ((try await action2(throwExc))?)?
     WriteLine(x)
     return Ok(x + 2)
 }

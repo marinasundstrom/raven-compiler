@@ -5,7 +5,7 @@ let a = handle("42")
 Console.WriteLine(a)
 
 func handle(text: string) -> Result<(), Exception> {
-    let x = try? throwing()
+    let x = (try throwing())?
     WriteLine(x)
     return Ok(x)
 }

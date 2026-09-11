@@ -13,7 +13,7 @@ let str = match res {
 WriteLine(str)
 
 async func test() -> Task<Result<string, Exception>> {
-    let r = try? await failingTask2()
+    let r = ((try await failingTask2())?)?
     return Ok("foo")
 }
 

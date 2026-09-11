@@ -25,4 +25,4 @@ Keep them when the combination is distinct; merge only true duplicates.
 - `http-client.rav` -> `HttpClient` + exception handling
 - `http-client-result.rav` -> `HttpClient` + `Result` via `try/catch`
 - `http-client-result-extension.rav` -> extension method returning `Result`
-- `http-client-result-propagation.rav` -> async propagation (`try?`) with HTTP
+- `http-client-result-propagation.rav` -> async propagation (`(try expression)?`) with HTTP

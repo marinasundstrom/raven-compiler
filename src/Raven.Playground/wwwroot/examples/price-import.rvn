@@ -6,7 +6,7 @@ let rows = [
 ]
 
 func ImportPrice(row: PriceRow) -> Result<decimal, Exception> {
-    let discount = try? Convert.ToInt32(row.Discount)
+    let discount = (try Convert.ToInt32(row.Discount))?
     return Ok(row.Price * (100m - discount) / 100m)
 }
 

@@ -5,8 +5,8 @@ let a = handle("42")
 Console.WriteLine(a)
 
 func handle(text: string) -> Result<int, Exception> {
-    // Use a throwing API to demonstrate `try?`; projected int.Parse returns Result.
-    let x = try? Convert.ToInt32(text)
+    // Use a throwing API to demonstrate `(try expression)?`; projected int.Parse returns Result.
+    let x = (try Convert.ToInt32(text))?
     WriteLine(x)
     return Ok(x)
 }
