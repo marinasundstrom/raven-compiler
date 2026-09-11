@@ -1,96 +1,68 @@
 ---
 _layout: landing
+title: A fresh language for .NET.
 ---
 
 <section class="raven-hero">
   <div class="raven-hero-copy">
-    <p class="raven-eyebrow">A modern language for .NET</p>
-    <h1>Write expressive programs.<br><span>Keep the whole platform.</span></h1>
-    <p class="raven-hero-lead">Raven brings typed, expression-oriented programming,
-    algebraic modeling, and familiar object-oriented design to the .NET ecosystem.</p>
+    <p class="raven-eyebrow">Raven programming language</p>
+    <h1>A fresh language<br><span>for .NET.</span></h1>
+    <p class="raven-hero-lead">Expressive functions, explicit data models, and familiar object-oriented programming—with the .NET libraries and tools you already use.</p>
     <div class="raven-hero-actions">
-      <a class="raven-button raven-button-primary" href="raven-in-60-seconds.md">Learn Raven <span aria-hidden="true">→</span></a>
-      <a class="raven-button" href="https://marinasundstrom.github.io/raven/playground/">Try it online</a>
+      <a class="raven-button raven-button-primary" href="https://marinasundstrom.github.io/raven/playground/?example=hello">Try Raven</a>
+      <a class="raven-button" href="getting-started.md">Install the SDK</a>
     </div>
-    <p class="raven-preview-note">Raven is under active development. Evolving areas are marked in the documentation.</p>
+    <p class="raven-preview-note"><a href="introduction.md">Take the language tour</a> · <a href="status.md">Preview status and compatibility</a></p>
+    <ul class="raven-capabilities" aria-label="Available today">
+      <li>.NET 10 &amp; 11</li><li>SDK &amp; templates</li><li>VS Code</li><li>Compiler APIs</li>
+    </ul>
   </div>
-  <div class="raven-hero-code raven-code-carousel" aria-label="Raven code examples" data-raven-carousel>
-    <div class="raven-code-slide" id="raven-sample-modeling" role="tabpanel" aria-labelledby="raven-sample-modeling-tab">
-      <div class="raven-code-titlebar"><span>Domain modeling · quote.rvn</span><span class="raven-code-dots" aria-hidden="true">● ● ●</span></div>
-      <pre><code class="lang-raven">record Shipment(Id: int, Weight: decimal)&#10;&#10;union QuoteResult {&#10;&#32;&#32;&#32;&#32;case Quoted(amount: decimal)&#10;&#32;&#32;&#32;&#32;case Rejected(reason: string)&#10;}&#10;&#10;func Quote(shipment: Shipment) -&gt; QuoteResult {&#10;&#32;&#32;&#32;&#32;if shipment.Weight &lt;= 0 {&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;return .Rejected("Weight must be positive")&#10;&#32;&#32;&#32;&#32;}&#10;&#10;&#32;&#32;&#32;&#32;return .Quoted(12.50m + shipment.Weight * 1.75m)&#10;}</code></pre>
-      <div class="raven-code-learn"><span>Records, unions, functions, and explicit states</span><a href="showcases/domain-modeling.md">Learn more <span aria-hidden="true">→</span></a></div>
-    </div>
-    <div class="raven-code-slide" id="raven-workload-web" role="tabpanel" aria-labelledby="raven-workload-web-tab" hidden>
-      <div class="raven-code-titlebar"><span>Web API · Program.rvn</span><span class="raven-code-dots" aria-hidden="true">● ● ●</span></div>
-      <pre><code class="lang-raven">import AspNetMinimalApi.Domain.*&#10;import Microsoft.AspNetCore.Builder.*&#10;&#10;let builder = WebApplication.CreateBuilder(args)&#10;builder.Services.AddOpenApi()&#10;&#10;use app = builder.Build()&#10;app.MapGet("/", func () =&gt; GetApiInfo())&#10;app.MapGet("/pets/{id}", FindPet)&#10;app.MapGet("/pets", StreamPets)&#10;app.MapPost("/pets/find", LookupPet)&#10;&#10;app.Run()</code></pre>
-      <div class="raven-code-learn"><span>ASP.NET Core, handlers, records, and unions</span><a href="showcases/web-api.md">Learn more <span aria-hidden="true">→</span></a></div>
-    </div>
-    <div class="raven-code-slide" id="raven-workload-embedded" role="tabpanel" aria-labelledby="raven-workload-embedded-tab" hidden>
-      <div class="raven-code-titlebar"><span>Embedded IoT · temperature.rvn</span><span class="raven-code-dots" aria-hidden="true">● ● ●</span></div>
-      <pre><code class="lang-raven">union TemperatureState {&#10;&#32;&#32;&#32;&#32;case SensorUnavailable&#10;&#32;&#32;&#32;&#32;case Comfortable(celsius: double)&#10;&#32;&#32;&#32;&#32;case TooHot(celsius: double)&#10;}&#10;&#10;func ActOn(state: TemperatureState, alarm: GpioPin) {&#10;&#32;&#32;&#32;&#32;match state {&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;.SensorUnavailable =&gt; alarm.Write(PinValue.High)&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;.Comfortable(_) =&gt; alarm.Write(PinValue.Low)&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;.TooHot(_) =&gt; alarm.Write(PinValue.High)&#10;&#32;&#32;&#32;&#32;}&#10;}</code></pre>
-      <div class="raven-code-learn"><span>.NET nanoFramework, sensor states, and GPIO</span><a href="showcases/embedded-iot.md">Learn more <span aria-hidden="true">→</span></a></div>
-    </div>
-    <div class="raven-code-slide" id="raven-sample-components" role="tabpanel" aria-labelledby="raven-sample-components-tab" hidden>
-      <div class="raven-code-titlebar"><span>Blazor component macros · Greeting.rvn · experimental</span><span class="raven-code-dots" aria-hidden="true">● ● ●</span></div>
-      <pre><code class="lang-raven">import System.Console.*&#10;&#10;component! Greeting(Name: string = &quot;&quot;) {&#10;&#32;&#32;&#32;&#32;WriteLine(&quot;Rendering Greeting for ${Name}&quot;)&#10;&#10;&#32;&#32;&#32;&#32;markup! {&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&lt;section class=&quot;greeting&quot;&gt;&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&lt;h1&gt;Hello {Name}&lt;/h1&gt;&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&lt;/section&gt;&#10;&#32;&#32;&#32;&#32;}&#10;}</code></pre>
-      <div class="raven-code-learn"><span>Composable macros expressed through ordinary Blazor</span><a href="showcases/html-components.md">Learn more <span aria-hidden="true">→</span></a></div>
-    </div>
-    <div class="raven-carousel-controls" role="tablist" aria-label="Choose a Raven example">
-      <button id="raven-sample-modeling-tab" type="button" role="tab" aria-controls="raven-sample-modeling" aria-selected="true">Modeling</button>
-      <button id="raven-workload-web-tab" type="button" role="tab" aria-controls="raven-workload-web" aria-selected="false" tabindex="-1">Web API</button>
-      <button id="raven-workload-embedded-tab" type="button" role="tab" aria-controls="raven-workload-embedded" aria-selected="false" tabindex="-1">Embedded IoT</button>
-      <button id="raven-sample-components-tab" type="button" role="tab" aria-controls="raven-sample-components" aria-selected="false" tabindex="-1">Component macros</button>
-    </div>
+  <div class="raven-hero-code">
+    <div class="raven-code-titlebar">Explicit states · quote.rvn</div>
+<div data-raven-playground="source"></div>
+<pre><code class="lang-raven">import&#32;System.Console.*&#10;&#10;union&#32;Quote&#32;{&#10;&#32;&#32;&#32;&#32;case&#32;Ready(total:&#32;decimal)&#10;&#32;&#32;&#32;&#32;case&#32;Rejected(reason:&#32;string)&#10;}&#10;&#10;func&#32;describe(quote:&#32;Quote)&#32;-&gt;&#32;string&#32;{&#10;&#32;&#32;&#32;&#32;quote&#32;match&#32;{&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;.Ready(let&#32;total)&#32;=&gt;&#32;&quot;Total:&#32;$total&quot;&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;.Rejected(let&#32;reason)&#32;=&gt;&#32;reason&#10;&#32;&#32;&#32;&#32;}&#10;}&#10;&#10;WriteLine(describe(.Ready(24.50m)))&#10;</code></pre>
+    <p class="raven-code-caption">Declare the possible states. Match each one.</p>
   </div>
 </section>
 
 <section class="raven-learning-path">
   <div class="raven-section-heading">
-    <p class="raven-eyebrow">Start here</p>
-    <h2>One clear path into Raven.</h2>
-    <p>Begin with the language itself. Install the compiler when you are ready
-    to run a program locally.</p>
+    <p class="raven-eyebrow">From first look to first program</p>
+    <h2>Start with something that runs.</h2>
   </div>
   <ol class="raven-path-steps">
-    <li>
-      <span class="raven-step-number">1</span>
-      <a href="raven-in-60-seconds.md">Raven in 60 seconds</a>
-      <p>Read one small program and learn the ideas that shape the language.</p>
-    </li>
-    <li>
-      <span class="raven-step-number">2</span>
-      <a href="introduction.md">Take the language tour</a>
-      <p>See functions, data modeling, patterns, failure handling, objects, and .NET interop.</p>
-    </li>
-    <li>
-      <span class="raven-step-number">3</span>
-      <a href="getting-started.md">Build and run Raven</a>
-      <p>Set up the source-built toolchain and create your first project.</p>
-    </li>
+    <li><span class="raven-step-number">1</span><a href="raven-in-60-seconds.md">Meet the language</a><p>Read one complete program, then change it in your browser.</p></li>
+    <li><span class="raven-step-number">2</span><a href="getting-started.md">Install and run</a><p>Download the SDK and run your first file. No source checkout required.</p></li>
+    <li><span class="raven-step-number">3</span><a href="introduction.md">Learn the ideas</a><p>Explore functions, records, unions, patterns, and .NET interop.</p></li>
   </ol>
-  <p class="raven-path-aside">Coming from .NET? Use the default path above, or keep the
-  <a href="raven-for-csharp-developers.md">Raven for C# developers</a> guide beside it.</p>
+  <p class="raven-path-aside">Already write C#? Start with <a href="raven-for-csharp-developers.md">familiar code, expressed in Raven</a>.</p>
+</section>
+
+<section class="raven-feature-section">
+  <div class="raven-section-heading"><p class="raven-eyebrow">Readable workflows</p><h2>Make absence and failure explicit.</h2><p><code>Option</code> represents absence; <code>Result</code> carries a success or an error. Propagate with <code>?</code> when the current operation cannot continue, or use <code>match</code> to handle each case.</p><p><a href="lang/features/option-and-result.md">Learn Option and Result</a></p></div>
+  <div class="raven-example-panel"><div data-raven-playground="source"></div>
+<pre><code class="lang-raven">import&#32;System.Console.*&#10;&#10;func&#32;readPort(text:&#32;string)&#32;-&gt;&#32;Option&lt;int&gt;&#32;{&#10;&#32;&#32;&#32;&#32;let&#32;port&#32;=&#32;int.TryParse(text)?&#10;&#32;&#32;&#32;&#32;if&#32;port&#32;&lt;=&#32;0&#32;||&#32;port&#32;&gt;&#32;65535&#32;{&#32;return&#32;.None&#32;}&#10;&#32;&#32;&#32;&#32;return&#32;.Some(port)&#10;}&#10;&#10;WriteLine(readPort(&quot;8080&quot;))&#10;WriteLine(readPort(&quot;invalid&quot;))</code></pre></div>
+</section>
+
+<section class="raven-feature-section">
+  <div class="raven-section-heading"><p class="raven-eyebrow">The platform you know</p><h2>Use ordinary .NET libraries.</h2><p>Call .NET APIs, use generic collections and LINQ, and build with NuGet and MSBuild. Raven also supports classes, interfaces, inheritance, and async methods.</p><p><a href="lang/features/dotnet-interop.md">Explore .NET interoperability</a></p></div>
+  <div class="raven-example-panel"><div data-raven-playground="source"></div>
+<pre><code class="lang-raven">import&#32;System.*&#10;import&#32;System.Linq.*&#10;import&#32;System.Console.*&#10;&#10;let&#32;names&#32;=&#32;[&quot;raven&quot;,&#32;&quot;dotnet&quot;,&#32;&quot;hello&quot;]&#10;let&#32;titles&#32;=&#32;names&#10;&#32;&#32;&#32;&#32;.Where(name&#32;=&gt;&#32;name.Length&#32;&gt;&#32;4)&#10;&#32;&#32;&#32;&#32;.Select(name&#32;=&gt;&#32;name.ToUpperInvariant())&#10;&#10;WriteLine(String.Join(&quot;,&#32;&quot;,&#32;titles))</code></pre></div>
+</section>
+
+<section class="raven-tooling">
+  <div class="raven-section-heading"><p class="raven-eyebrow">A complete working environment</p><h2>Write, run, and understand your code.</h2><p>The SDK, editor extension, and compiler services share the same language implementation.</p></div>
+  <div class="raven-tool-grid">
+    <div><h3>SDK and templates</h3><p>Create console apps, libraries, and web projects. Build and run them with <code>rvn</code>.</p><a href="getting-started.md">Install the SDK</a></div>
+    <div><h3>VS Code</h3><p>Completion, diagnostics, hover, navigation, and refactorings while you edit.</p><a href="compiler/raven-vscode-extension.md">Set up the extension</a></div>
+    <div><h3>Compiler services</h3><p>Work with syntax trees, symbols, and semantic models. Extend analysis with analyzers and source generators.</p><a href="compiler/index.md">Explore the tools and APIs</a></div>
+  </div>
+
 </section>
 
 <section class="raven-web-showcase">
-  <div>
-    <p class="raven-eyebrow">A real .NET workload</p>
-    <h2>Build an ASP.NET Core API.</h2>
-    <p>The pet-shelter sample uses ordinary ASP.NET Core routing, OpenAPI, async
-    handlers, and streaming responses. Raven records and unions model the API
-    domain without giving up the framework you already know.</p>
-    <a class="raven-button raven-button-primary" href="workloads/web-api.md">Build the web API <span aria-hidden="true">→</span></a>
-  </div>
-  <div class="raven-workload-points" aria-label="Web API sample capabilities">
-    <div><strong>ASP.NET Core</strong><span>Minimal APIs and dependency injection</span></div>
-    <div><strong>Typed domains</strong><span>Records, unions, and pattern matching</span></div>
-    <div><strong>Production shapes</strong><span>OpenAPI, async handlers, and streams</span></div>
-  </div>
+  <div><p class="raven-eyebrow">Build an application</p><h2>An ASP.NET Core API, in Raven.</h2><p>The pet-shelter sample combines routing, OpenAPI, async handlers, and streaming responses with Raven records and unions.</p><a class="raven-button raven-button-primary" href="workloads/web-api.md">Build the web API</a></div>
+  <div class="raven-workload-points"><div><strong>More places to explore</strong><span><a href="workloads/embedded-iot.md">Embedded IoT</a> and <a href="workloads/iot-monitor.md">Native AOT</a></span></div><div><strong>Experimental</strong><span><a href="showcases/html-components.md">Blazor component macros</a> · evolving syntax and tooling</span></div></div>
 </section>
 
-<section class="raven-reference-callout">
-  <p><strong>Already learning Raven?</strong> Go directly to the
-  <a href="lang/features/index.md">language feature guides</a>, look up syntax
-  and precise rules in the <a href="lang/spec/index.md">language reference</a>, or open the
-  <a href="compiler/index.md">tooling documentation</a>.</p>
-</section>
+<section class="raven-reference-callout"><p><strong>Raven is in preview.</strong> Use the <a href="status.md">release and compatibility guide</a> to distinguish available releases from upcoming language changes.</p></section>

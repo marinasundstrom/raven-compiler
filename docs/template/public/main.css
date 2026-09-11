@@ -297,11 +297,11 @@ body:has(.raven-hero) article {
 
 .raven-hero {
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(32rem, 1.1fr);
-    gap: clamp(2.5rem, 7vw, 7rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: clamp(2rem, 4vw, 4rem);
     align-items: center;
     width: min(90rem, calc(100% - 3rem));
-    min-height: min(46rem, calc(100vh - 4.5rem));
+    min-height: 0;
     margin: 0 auto;
     padding: 0;
 }
@@ -316,11 +316,11 @@ body:has(.raven-hero) article {
 }
 
 .raven-hero h1 {
-    max-width: 13ch;
+    max-width: 18ch;
     margin: 0;
-    font-size: clamp(3.3rem, 6.5vw, 6.4rem);
-    line-height: 0.96;
-    letter-spacing: -0.06em;
+    font-size: clamp(2.8rem, 4.5vw, 4.4rem);
+    line-height: 1.08;
+    letter-spacing: -0.04em;
 }
 
 .raven-hero h1 span {
@@ -663,3 +663,49 @@ body:has(.raven-hero) article {
         min-height: 6.5rem;
     }
 }
+
+/* Install commands remain selectable and readable on every platform. */
+.raven-install-tabs { margin: 1.5rem 0; }
+.raven-install-tabs [role="tablist"] { display: flex; gap: .5rem; border-bottom: 1px solid var(--raven-line); padding-bottom: .6rem; }
+.raven-install-tabs button { padding: .6rem 1rem; border: 1px solid var(--raven-line); border-radius: .5rem; background: var(--raven-surface); color: var(--raven-ink); font: inherit; }
+.raven-install-tabs button[aria-selected="true"] { background: var(--raven-accent-soft); border-color: var(--raven-accent); }
+.raven-install-tabs button:focus-visible { outline: 2px solid var(--raven-accent); outline-offset: 3px; }
+.raven-install-tabs [role="tabpanel"] { padding-top: 1rem; }
+[hidden] { display: none !important; }
+
+/* A compact introduction leaves the code and primary actions in view. */
+.raven-hero { padding: 3rem 0; max-width: 78rem; }
+.raven-capabilities { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; list-style: none; padding: 0; margin: 1.8rem 0 0; font-size: .9rem; color: var(--raven-muted); }
+.raven-capabilities li { padding-bottom: .35rem; border-bottom: 2px solid var(--raven-line); }
+.raven-hero-code { transform: none; }
+.raven-hero-code pre { min-height: 0; }
+.raven-code-caption { padding: 0 1.2rem 1rem; margin: 0; color: var(--raven-muted); font-size: .9rem; }
+.raven-hero-code .raven-sample-actions { margin: 0; padding: .8rem 1.2rem; }
+.raven-learning-path { padding-top: 4rem; padding-bottom: 4rem; }
+.raven-feature-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: 3rem; max-width: 74rem; margin: auto; padding: 4rem 1.5rem; border-bottom: 1px solid var(--raven-line); }
+.raven-feature-section h2, .raven-tooling h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.18; }
+.raven-example-panel { min-width: 0; }
+.raven-tooling { max-width: 74rem; margin: auto; padding: 4rem 1.5rem; }
+.raven-tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; margin-top: 2rem; }
+.raven-tool-grid > div { padding-top: 1rem; border-top: 2px solid var(--raven-accent); }
+.raven-tool-grid h3 { font-size: 1.3rem; }
+.raven-tool-grid p { color: var(--raven-muted); }
+body:not(:has(.raven-hero)) article { max-width: 72ch; }
+body > main > .content > .raven-doc-navigation { display: block; padding: 1rem 0; border-bottom: 1px solid var(--raven-line); margin-bottom: 1.5rem; }
+.raven-doc-navigation summary { font-weight: 700; cursor: pointer; }
+.raven-doc-navigation nav { display: flex; flex-wrap: wrap; gap: .65rem 1.2rem; padding-top: .8rem; font-size: .95rem; }
+.raven-doc-navigation a[aria-current="page"] { font-weight: 750; color: var(--raven-ink); }
+@media (min-width: 992px) {
+  body:not([data-search]):not(:has(.raven-hero))[data-layout] > main > .content:has(.raven-doc-navigation) { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: 0 2rem; }
+  body:not(:has(.raven-hero)) .content > .actionbar { grid-column: 1 / -1; }
+  body:not(:has(.raven-hero)) .content > article { grid-column: 2; grid-row: 2; }
+  body:not(:has(.raven-hero)) .content > :not(article):not(.actionbar):not(.raven-doc-navigation) { grid-column: 2; }
+  .raven-doc-navigation { grid-column: 1; grid-row: 2; position: sticky; top: 5rem; align-self: start; border-bottom: 0; max-height: calc(100vh - 6rem); overflow-y: auto; }
+  .raven-doc-navigation nav { flex-direction: column; }
+}
+@media (max-width: 991.98px) {
+  .raven-feature-section, .raven-tool-grid { grid-template-columns: 1fr; }
+  .raven-feature-section { gap: 1rem; }
+  .raven-hero { padding: 2rem 0; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

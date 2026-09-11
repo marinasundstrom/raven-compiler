@@ -122,56 +122,34 @@ const raven = (hljs) => ({
   ]
 })
 
+// Manual tabs keep code and installation commands stable while readers use them.
 const initializeCarousels = () => {
-  document.querySelectorAll('[data-raven-carousel]').forEach((carousel) => {
-    const tabs = [...carousel.querySelectorAll('[role="tab"]')]
-    const slides = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')))
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    let activeIndex = 0
-    let interval
-
-    const select = (index, moveFocus = false) => {
-      activeIndex = (index + tabs.length) % tabs.length
-      tabs.forEach((tab, tabIndex) => {
-        const isActive = tabIndex === activeIndex
-        tab.setAttribute('aria-selected', String(isActive))
-        tab.tabIndex = isActive ? 0 : -1
-        slides[tabIndex].hidden = !isActive
+  document.querySelectorAll('[data-raven-carousel], [data-raven-tabs]').forEach((group) => {
+    const tabs = [...group.querySelectorAll('[role="tab"]')]
+    const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')))
+    const select = (index, focus = false) => {
+      tabs.forEach((tab, i) => {
+        tab.setAttribute('aria-selected', String(i === index))
+        tab.tabIndex = i === index ? 0 : -1
+        panels[i].hidden = i !== index
       })
-
-      if (moveFocus) tabs[activeIndex].focus()
+      if (focus) tabs[index].focus()
     }
-
-    const stop = () => window.clearInterval(interval)
-    const start = () => {
-      stop()
-      if (!reduceMotion.matches) {
-        interval = window.setInterval(() => select(activeIndex + 1), 7000)
-      }
-    }
-
     tabs.forEach((tab, index) => {
-      tab.addEventListener('click', () => {
-        select(index)
-        start()
-      })
+      tab.addEventListener('click', () => select(index))
       tab.addEventListener('keydown', (event) => {
-        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        const next = {
+          ArrowRight: (index + 1) % tabs.length,
+          ArrowLeft: (index - 1 + tabs.length) % tabs.length,
+          Home: 0,
+          End: tabs.length - 1
+        }[event.key]
+        if (next !== undefined) {
           event.preventDefault()
-          select(activeIndex + (event.key === 'ArrowRight' ? 1 : -1), true)
-          start()
+          select(next, true)
         }
       })
     })
-
-    carousel.addEventListener('mouseenter', stop)
-    carousel.addEventListener('mouseleave', start)
-    carousel.addEventListener('focusin', stop)
-    carousel.addEventListener('focusout', (event) => {
-      if (!carousel.contains(event.relatedTarget)) start()
-    })
-    reduceMotion.addEventListener('change', start)
-    start()
   })
 }
 
@@ -235,7 +213,43 @@ const initializePlaygroundSamples = () => {
   })
 }
 
+const initializeDocumentationNavigation = () => {
+  if (document.querySelector('.raven-hero') || document.querySelector('#toc')) return
+  const content = document.querySelector('main > .content')
+  if (!content || content.querySelector('.raven-doc-navigation')) return
+  const root = new URL(document.querySelector('meta[name="docfx:rel"]')?.content ?? '', document.baseURI)
+  const details = document.createElement('details')
+  details.className = 'raven-doc-navigation'
+  details.open = window.matchMedia('(min-width: 992px)').matches
+  const summary = document.createElement('summary')
+  summary.textContent = 'Documentation'
+  details.append(summary)
+  const nav = document.createElement('nav')
+  nav.setAttribute('aria-label', 'Documentation sections')
+  const links = [
+    ['Install and run', 'getting-started.html'],
+    ['Learn Raven', 'learn.html'],
+    ['Language tour', 'introduction.html'],
+    ['For C# developers', 'raven-for-csharp-developers.html'],
+    ['Language reference', 'lang/spec/index.html'],
+    ['Build applications', 'workloads/index.html'],
+    ['Tools and APIs', 'compiler/index.html'],
+    ['Release status', 'status.html'],
+    ['Contribute', 'https://github.com/marinasundstrom/raven/blob/main/CONTRIBUTING.md']
+  ]
+  links.forEach(([label, path]) => {
+    const link = document.createElement('a')
+    link.href = new URL(path, root).href
+    link.textContent = label
+    if (link.href === window.location.href.split('#')[0]) link.setAttribute('aria-current', 'page')
+    nav.append(link)
+  })
+  details.append(nav)
+  content.insertBefore(details, content.querySelector('article'))
+}
+
 const initializeRavenSite = () => {
+  initializeDocumentationNavigation()
   initializeCarousels()
   initializePlaygroundSamples()
 }
