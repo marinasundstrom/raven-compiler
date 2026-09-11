@@ -6,7 +6,7 @@ on:
       version:
         description: Published version restorable from NuGet.org without a leading v
         required: true
-        default: 0.1.10
+        default: 0.1.11
 
 permissions:
   contents: read

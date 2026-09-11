@@ -56,12 +56,12 @@ both `VERSION` and `sdk/build/Raven.Language.targets`.
 Release builds can be installed directly with the platform installer:
 
 ```bash
-curl -fsSL https://github.com/marinasundstrom/raven/releases/download/v0.1.10/install-raven.sh \
-  | sh -s -- 0.1.10
+curl -fsSL https://github.com/marinasundstrom/raven/releases/download/v0.1.11/install-raven.sh \
+  | sh -s -- 0.1.11
 ```
 
 ```powershell
-$version = "0.1.10"
+$version = "0.1.11"
 Invoke-WebRequest "https://github.com/marinasundstrom/raven/releases/download/v$version/install-raven.ps1" -OutFile install-raven.ps1
 ./install-raven.ps1 -Version $version
 ```
@@ -76,9 +76,9 @@ Add `~/.raven/bin` to PATH after installation, then run `rvn doctor`.
 Run the package script with a .NET runtime identifier and version:
 
 ```bash
-scripts/package-sdk.sh osx-arm64 0.1.10
-scripts/package-sdk.sh linux-x64 0.1.10
-scripts/package-sdk.sh win-x64 0.1.10
+scripts/package-sdk.sh osx-arm64 0.1.11
+scripts/package-sdk.sh linux-x64 0.1.11
+scripts/package-sdk.sh win-x64 0.1.11
 ```
 
 Artifacts are written to `artifacts/distribution` by default. The distributable
@@ -91,8 +91,8 @@ safe to run from a clean checkout without relying on ignored build outputs.
 Validate a staged SDK before publishing it:
 
 ```bash
-scripts/test-distribution.sh artifacts/distribution/raven-sdk-0.1.10-osx-arm64
-scripts/test-distribution.sh --structure-only artifacts/distribution/raven-sdk-0.1.10-win-arm64
+scripts/test-distribution.sh artifacts/distribution/raven-sdk-0.1.11-osx-arm64
+scripts/test-distribution.sh --structure-only artifacts/distribution/raven-sdk-0.1.11-win-arm64
 ```
 
 Use `--structure-only` when inspecting an archive that cannot execute on the
@@ -125,7 +125,7 @@ example, after `0.1.0` has been published, a build from later source uses
 a version such as:
 
 ```text
-0.1.10-preview.1-local.<sha>
+0.1.11-preview.1-local.<sha>
 ```
 
 Do not use `0.1.0-local.<sha>` for later source. That spelling makes
@@ -136,7 +136,7 @@ misleading version family.
 Use the same complete version for every artifact built from one commit:
 
 ```bash
-version="0.1.10-preview.1-local.$(git rev-parse --short HEAD)"
+version="0.1.11-preview.1-local.$(git rev-parse --short HEAD)"
 scripts/package-sdk.sh osx-arm64 "$version"
 scripts/package-nuget.sh "$version"
 scripts/package-vscode.sh "$version"
@@ -199,12 +199,11 @@ internal `docs/testing/release-and-bootstrap-gates.md` checklist, including the
 active SDK and repository-versus-installed toolchain provenance.
 
 Every push to `main` runs `scripts/test-ci.sh`: the repository's ordered
-generator/compiler build, the normal baseline, the isolated runtime/emission
-suite, and all language-server unit, integration, and performance-test
-projects. The gate also packs the just-built SDK into the repository-local feed
-so workspace tests never depend on a previously published or globally cached
-Raven SDK. During development, run the smallest affected suites before
-integration; Main CI is the one authoritative complete gate.
+generator/compiler build, a bounded compiler-contract filter, Core tests, and
+language-server unit tests. Main CI is the required integration gate; broad
+baseline, isolated runtime, sample, language-server integration, and performance
+checks remain separate qualification runs. During development, run the smallest
+affected suites before integration and retain the release checks listed above.
 
 If a check requires a fix, commit the fix, repeat the affected checks, and push
 it. Wait for Main CI to pass, then tag that exact commit and push the tag:
@@ -482,13 +481,13 @@ The extension contains a framework-dependent copy of the Raven language
 server so editor features work without a platform-specific VSIX. Build it with:
 
 ```bash
-scripts/package-vscode.sh 0.1.10
+scripts/package-vscode.sh 0.1.11
 ```
 
 Install the published release directly from GitHub Releases:
 
 ```bash
-curl -fLO https://github.com/marinasundstrom/raven/releases/download/v0.1.10/raven-vscode.vsix
+curl -fLO https://github.com/marinasundstrom/raven/releases/download/v0.1.11/raven-vscode.vsix
 code --install-extension raven-vscode.vsix --force
 ```
 

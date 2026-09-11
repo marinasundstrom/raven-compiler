@@ -2,7 +2,7 @@
   "name": "raven-vscode",
   "displayName": "Raven",
   "description": "VS Code extension for the Raven language server.",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "publisher": "raven",
   "license": "MIT",
   "repository": {

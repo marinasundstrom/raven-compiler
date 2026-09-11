@@ -179,13 +179,13 @@ Use a project-local `global.json` to pin the exact .NET SDK feature band for a
 repository when reproducible SDK selection is required.
 
 The Raven sample projects use the bare `Sdk="Raven.Sdk"` form. The repository
-root selects `Raven.Sdk` version `0.1.10` centrally through
+root selects `Raven.Sdk` version `0.1.11` centrally through
 `global.json`. A fresh checkout therefore needs no globally installed Raven
 SDK: restore uses the local `artifacts/packages` feed when populated and falls
 back to NuGet.org. Before that version is public, populate the local feed with:
 
 ```bash
-scripts/package-nuget.sh 0.1.10
+scripts/package-nuget.sh 0.1.11
 ```
 
 ## Quick Start

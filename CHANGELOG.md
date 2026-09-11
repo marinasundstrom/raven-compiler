@@ -1,8 +1,18 @@
 # Raven Changelog
 
-Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
+Behavior-focused timeline covering **2025-09-12** to **2026-09-11**.
 
 ## Unreleased
+
+### Breaking changes
+
+- None recorded.
+
+## 0.1.11 - 2026-09-11
+
+### Breaking changes
+
+- None.
 
 ### Fixed
 
@@ -73,10 +83,6 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-06**.
   assemblies and their metadata contexts from being garbage collected.
 - Website publication now requires the Playground browser smoke suite, including
   a cold compile-and-run before any editor semantic queries.
-
-### Breaking changes
-
-- None recorded.
 
 ## 0.1.10 - 2026-09-06
 
