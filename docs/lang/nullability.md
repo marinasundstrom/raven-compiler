@@ -191,6 +191,11 @@ warning `RAV0403`:
 let length = value!.Length
 ```
 
+For references, `!` inserts no runtime null check. For nullable value types,
+it extracts the underlying value and throws `InvalidOperationException` if
+the value is absent. This value-type extraction goes beyond C#'s
+null-forgiving operator; see [Nullable suppression](spec/type-system.md#nullable-suppression).
+
 Suppression is appropriate only when the programmer has knowledge the type
 does not express. Prefer a pattern when the program can prove the state.
 

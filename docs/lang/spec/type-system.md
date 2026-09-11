@@ -247,10 +247,17 @@ func inspect(value: string?) {
 }
 ```
 
-A direct `is null`, `is not null`, `== null`, or `!= null` check does not change
+By default, a direct `is null`, `is not null`, `== null`, or `!= null` check does not change
 the static type of the checked storage. Dereferencing the original `value`
 inside such a branch remains an error when it has type `string?`. Reference and
 value types follow the same rule.
+
+Projects can enable `<EnableIsNotNullNarrowing>true</EnableIsNotNullNarrowing>`
+to narrow an immutable local or parameter inside the true branch of a direct
+`value is not null` check. The declared symbol and uses outside that branch
+remain nullable. This option does not narrow mutable locals or enable general
+flow analysis through equality checks, boolean combinations, or early returns.
+See [Opt-in compatibility narrowing](../nullability.md#opt-in-compatibility-narrowing).
 
 Prefer `is null` and `is not null` for identity tests. `== null` and `!= null`
 are valid but may invoke user-defined equality. An analyzer warns about that
@@ -272,6 +279,14 @@ For a nullable reference, suppression changes the static type without inserting
 a runtime null check. For a nullable value type, it unwraps the value. The
 effect applies only to the annotated expression and reports warning `RAV0403`
 on that full expression.
+
+The reference-type behavior has the same runtime intent as C#'s null-forgiving
+operator: `!` does not validate a non-null assertion. A null reference remains
+null, and a later dereference can fail. Raven's nullable value-type behavior is
+an extension: `int?` becomes `int` by extracting `Nullable<int>.Value`, which
+throws `InvalidOperationException` when no value is present. C#'s `!` alone
+does not perform that extraction. See the
+[C# null-forgiving operator reference](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/null-forgiving).
 
 Raven recommends `Option<T>` when absence is an intentional part of a domain
 API. Nullable types remain useful for .NET interoperability and gradual
