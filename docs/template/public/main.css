@@ -756,3 +756,36 @@ body[data-layout]:not([data-search]):has(.raven-reference-topics) > main > .affi
 @media (max-width: 767.98px) {
     .raven-reference-topics { grid-template-columns: 1fr; gap: 1.5rem; }
 }
+
+/* Keep navigation controls and keyboard focus visible in both color schemes. */
+body .btn[data-bs-toggle],
+body .btn[data-bs-dismiss] {
+    color: var(--raven-ink);
+}
+
+body :is(a, button, input, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--raven-accent);
+    outline-offset: 3px;
+}
+
+html[data-bs-theme="dark"] .raven-button-primary,
+html[data-bs-theme="dark"] .raven-button-primary:hover {
+    color: var(--raven-bg);
+}
+
+.raven-skip-link {
+    position: fixed;
+    top: 0.6rem;
+    left: 0.6rem;
+    z-index: 2000;
+    padding: 0.7rem 1rem;
+    background: var(--raven-surface);
+    color: var(--raven-ink);
+    border: 1px solid var(--raven-accent);
+    border-radius: 0.5rem;
+    transform: translateY(-200%);
+}
+
+.raven-skip-link:focus {
+    transform: translateY(0);
+}

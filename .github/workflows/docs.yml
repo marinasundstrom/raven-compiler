@@ -14,6 +14,7 @@ on:
       - "scripts/site-provenance-version.mjs"
       - "scripts/test-site-provenance-version.mjs"
       - "scripts/test-site-navigation.sh"
+      - "scripts/test-docs-browser.mjs"
       - "scripts/add-production-analytics.sh"
       - "scripts/test-raven-highlighting-sync.mjs"
       - "scripts/codex-build.sh"
@@ -95,6 +96,9 @@ jobs:
 
       - name: Check site-root navigation
         run: scripts/test-site-navigation.sh
+
+      - name: Check documentation in the browser
+        run: node scripts/test-docs-browser.mjs _site
 
       - name: Add production analytics
         if: github.event_name == 'workflow_dispatch' && inputs.publish_site

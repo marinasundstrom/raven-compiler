@@ -291,7 +291,30 @@ const initializeReferenceFinder = () => {
   finder.hidden = false
 }
 
+const initializeSkipLink = () => {
+  const article = document.querySelector('main article')
+  if (!article || document.querySelector('.raven-skip-link')) return
+  if (!article.id) article.id = 'raven-main-content'
+  article.tabIndex = -1
+  const link = document.createElement('a')
+  link.className = 'raven-skip-link'
+  link.href = `#${article.id}`
+  link.textContent = 'Skip to content'
+  link.addEventListener('click', () => article.focus())
+  document.body.prepend(link)
+  // DocFX's mobile TOC initialization can leave the sequential focus starting
+  // point after the header even while body remains active. Start keyboard-only
+  // navigation at the skip link without stealing focus on page load.
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Tab' && !event.shiftKey && document.activeElement === document.body) {
+      event.preventDefault()
+      link.focus()
+    }
+  }, { once: true })
+}
+
 const initializeRavenSite = () => {
+  initializeSkipLink()
   initializeReferenceFinder()
   initializeDocumentationNavigation()
   initializeCarousels()
