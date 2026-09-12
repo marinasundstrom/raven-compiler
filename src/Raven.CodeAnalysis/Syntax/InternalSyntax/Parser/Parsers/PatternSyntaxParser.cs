@@ -906,7 +906,8 @@ internal class PatternSyntaxParser : SyntaxParser
         // This allows: > 30, > x + 1, > Foo(3), etc.
         var expression = new ExpressionSyntaxParser(
             this,
-            stopOnOpenBrace: StopsOnOpenBrace).ParseExpression();
+            stopOnOpenBrace: StopsOnOpenBrace,
+            allowLambdaExpressions: false).ParseExpression();
 
         var kind = GetComparisonPatternKind(operatorToken.Kind);
         return ComparisonPattern(kind, operatorToken, expression);

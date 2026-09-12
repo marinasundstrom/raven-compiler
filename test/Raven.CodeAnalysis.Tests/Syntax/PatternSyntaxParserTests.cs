@@ -10,6 +10,21 @@ namespace Raven.CodeAnalysis.Syntax.Tests;
 
 public class PatternSyntaxParserTests
 {
+    [Theory]
+    [InlineData("==")]
+    [InlineData("!=")]
+    [InlineData(">")]
+    [InlineData(">=")]
+    [InlineData("<")]
+    [InlineData("<=")]
+    public void ComparisonPattern_VariableOperand_DoesNotConsumeMatchArmArrow(string op)
+    {
+        var tree = SyntaxTree.ParseText($"let result = value match {{ {op} preferred => true, _ => false }}");
+        AssertNoErrors(tree);
+        var comparison = tree.GetRoot().DescendantNodes().OfType<ComparisonPatternSyntax>().Single();
+        Assert.Equal("preferred", Assert.IsType<IdentifierNameSyntax>(comparison.Expression).Identifier.ValueText);
+    }
+
     [Fact]
     public void DeclarationPattern_WithIdentifier_Parses()
     {
