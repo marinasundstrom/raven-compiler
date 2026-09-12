@@ -21,7 +21,7 @@ title: A fresh language for .NET.
     <div class="raven-code-titlebar">Explicit states · quote.rvn</div>
 <div data-raven-playground="source"></div>
 <pre><code class="lang-raven">import&#32;System.Console.*&#10;&#10;union&#32;Quote&#32;{&#10;&#32;&#32;&#32;&#32;case&#32;Ready(total:&#32;decimal)&#10;&#32;&#32;&#32;&#32;case&#32;Rejected(reason:&#32;string)&#10;}&#10;&#10;func&#32;describe(quote:&#32;Quote)&#32;-&gt;&#32;string&#32;{&#10;&#32;&#32;&#32;&#32;quote&#32;match&#32;{&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;.Ready(let&#32;total)&#32;=&gt;&#32;&quot;Total:&#32;$total&quot;&#10;&#32;&#32;&#32;&#32;&#32;&#32;&#32;&#32;.Rejected(let&#32;reason)&#32;=&gt;&#32;reason&#10;&#32;&#32;&#32;&#32;}&#10;}&#10;&#10;WriteLine(describe(.Ready(24.50m)))&#10;</code></pre>
-    <p class="raven-code-caption">Declare the possible states. Match each one.</p>
+    <p class="raven-code-caption">Each state carries its own data. Match the outcomes in one expression.</p>
   </div>
 </section>
 
@@ -45,13 +45,13 @@ title: A fresh language for .NET.
 </section>
 
 <section class="raven-feature-section">
-  <div class="raven-section-heading"><p class="raven-eyebrow">The platform you know</p><h2>Use ordinary .NET libraries.</h2><p>Call .NET APIs, use generic collections and LINQ, and build with NuGet and MSBuild. Raven also supports classes, interfaces, inheritance, and async methods.</p><p><a href="lang/features/dotnet-interop.md">Explore .NET interoperability</a></p></div>
+  <div class="raven-section-heading"><p class="raven-eyebrow">The platform you know</p><h2>Use ordinary .NET libraries.</h2><p>Keep using .NET APIs, generic collections, LINQ, NuGet, and MSBuild. Combine that familiar foundation with Raven’s explicit data models and value-based error handling.</p><p><a href="lang/features/dotnet-interop.md">Explore .NET interoperability</a></p></div>
   <div class="raven-example-panel"><div data-raven-playground="source"></div>
 <pre><code class="lang-raven">import&#32;System.*&#10;import&#32;System.Linq.*&#10;import&#32;System.Console.*&#10;&#10;let&#32;names&#32;=&#32;[&quot;raven&quot;,&#32;&quot;dotnet&quot;,&#32;&quot;hello&quot;]&#10;let&#32;titles&#32;=&#32;names&#10;&#32;&#32;&#32;&#32;.Where(name&#32;=&gt;&#32;name.Length&#32;&gt;&#32;4)&#10;&#32;&#32;&#32;&#32;.Select(name&#32;=&gt;&#32;name.ToUpperInvariant())&#10;&#10;WriteLine(String.Join(&quot;,&#32;&quot;,&#32;titles))</code></pre></div>
 </section>
 
 <section class="raven-tooling">
-  <div class="raven-section-heading"><p class="raven-eyebrow">A complete working environment</p><h2>Write, run, and understand your code.</h2><p>The SDK, editor extension, and compiler services share the same language implementation.</p></div>
+  <div class="raven-section-heading"><p class="raven-eyebrow">A complete working environment</p><h2>Write, run, and understand your code.</h2><p>Use the same compiler services in your editor and in tools that analyze Raven code.</p></div>
   <div class="raven-tool-grid">
     <div><h3>SDK and templates</h3><p>Create console apps, libraries, and web projects. Build and run them with <code>rvn</code>.</p><a href="getting-started.md">Install the SDK</a></div>
     <div><h3>VS Code</h3><p>Completion, diagnostics, hover, navigation, and refactorings while you edit.</p><a href="compiler/raven-vscode-extension.md">Set up the extension</a></div>

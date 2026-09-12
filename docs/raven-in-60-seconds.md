@@ -1,8 +1,11 @@
 # Raven in 60 seconds
 
-Raven is a typed, expression-oriented language for .NET. Small programs can use
-top-level statements, while larger programs can combine functions, records,
-unions, classes, and interfaces.
+Raven brings expression-oriented code and explicit state modeling to .NET.
+If you write C#, the records, decimal arithmetic, and console call below will
+look familiar. Focus on how the quote's possible outcomes carry their own data
+and how the caller handles them.
+
+<div data-raven-playground="source"></div>
 
 ```raven
 import System.Console.*
@@ -33,18 +36,18 @@ let message = match Quote(shipment) {
 WriteLine(message)
 ```
 
-This program shows the main shape of Raven:
+`Quoted` carries an amount; `Rejected` carries a reason. Each outcome has the
+data it needs, and `match` makes the handling visible in one place.
 
-- `import` exposes .NET namespaces, types, or static members.
-- `record` defines a value-oriented data type with a primary constructor.
-- `union` defines a closed set of cases, each of which can carry data.
-- `func` declares a function without requiring a containing utility class.
-- `let` introduces an immutable local binding; use `var` when reassignment is
-  intentional.
-- `if` and `match` are expressions, although they can also be used for effects.
-- Pattern arms bind values explicitly, such as `let amount`.
-- String interpolation uses `$name` inside a string.
-- .NET APIs such as `System.Console.WriteLine` are available directly.
+A few Raven spellings carry the rest of the example:
+
+- `let` declares a binding that cannot be reassigned; `var` allows reassignment.
+- `.Quoted` and `.Rejected` use the type supplied by their context.
+- `let amount` captures a case's payload. The binding keyword makes capture
+  explicit, distinct from comparing with an existing value.
+- `func` declares a function that can live directly in a namespace.
+
+The surrounding .NET APIs remain available in the same program.
 
 ## Expected failure is data
 
@@ -68,7 +71,7 @@ The `try` expression remains available for genuinely throwing APIs, and the
 propagation operator `?` can return an error from the current function when no
 local handling is needed.
 
-## Objects remain available
+## Keep familiar .NET design where it fits
 
 Use a class when identity, mutable state, lifecycle, or open polymorphism is
 part of the model. Use records and unions for value-shaped and closed-domain
