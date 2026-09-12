@@ -1,8 +1,14 @@
 # Raven Changelog
 
-Behavior-focused timeline covering **2025-09-12** to **2026-09-11**.
+Behavior-focused timeline covering **2025-09-12** to **2026-09-12**.
 
 ## Unreleased
+
+### Breaking changes
+
+- None recorded.
+
+## 0.1.12 - 2026-09-12
 
 ### Breaking changes
 

@@ -26,8 +26,8 @@ SDK feature band used by `dotnet` and MSBuild.
 <section id="install-unix" role="tabpanel" aria-labelledby="install-unix-tab" tabindex="0">
 
 ```bash
-curl -fsSL https://github.com/marinasundstrom/raven/releases/download/v0.1.11/install-raven.sh \
-  | sh -s -- 0.1.11
+curl -fsSL https://github.com/marinasundstrom/raven/releases/download/v0.1.12/install-raven.sh \
+  | sh -s -- 0.1.12
 export PATH="$HOME/.raven/bin:$PATH"
 ```
 
@@ -38,7 +38,7 @@ terminals.
 <section id="install-windows" role="tabpanel" aria-labelledby="install-windows-tab" tabindex="0" hidden>
 
 ```powershell
-$version = "0.1.11"
+$version = "0.1.12"
 Invoke-WebRequest "https://github.com/marinasundstrom/raven/releases/download/v$version/install-raven.ps1" -OutFile install-raven.ps1
 ./install-raven.ps1 -Version $version
 $env:PATH = "$HOME\.raven\bin;$env:PATH"
@@ -113,7 +113,7 @@ configuration, or run `rvn init --list` for the available scaffolds.
 
 ## 4. Open in VS Code
 
-Download the [VS Code extension for 0.1.11](https://github.com/marinasundstrom/raven/releases/download/v0.1.11/raven-vscode.vsix).
+Download the [VS Code extension for 0.1.12](https://github.com/marinasundstrom/raven/releases/download/v0.1.12/raven-vscode.vsix).
 From the directory containing the downloaded file, run:
 
 ```text

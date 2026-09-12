@@ -1,6 +1,6 @@
 {
   "msbuild-sdks": {
-    "Raven.Sdk": "0.1.11"
+    "Raven.Sdk": "0.1.12"
   },
   "sdk": {
     "version": "11.0.100-preview.7.26381.103",

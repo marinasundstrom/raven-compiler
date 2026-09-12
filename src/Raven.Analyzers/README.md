@@ -6,7 +6,7 @@ Install the package with a normal `PackageReference`:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="Raven.Analyzers" Version="0.1.11" />
+  <PackageReference Include="Raven.Analyzers" Version="0.1.12" />
 </ItemGroup>
 ```
 
