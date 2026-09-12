@@ -58,8 +58,8 @@ title: A fresh language for .NET.
     <div><h3>Compiler services</h3><p>Work with syntax trees, symbols, and semantic models. Extend analysis with analyzers and source generators.</p><a href="compiler/index.md">Explore the tools and APIs</a></div>
   </div>
   <figure class="raven-editor-figure">
-    <a href="images/raven-vscode.png" aria-label="Open the full Raven editor screenshot"><img src="images/raven-vscode.png" alt="Raven in Visual Studio Code: a Quote union and match expression with syntax highlighting, inferred type hints, and parameter names" width="1152" height="768" loading="lazy"></a>
-    <figcaption>Raven in VS Code, with compiler-backed type and parameter hints.</figcaption>
+    <a href="images/raven-vscode.png" aria-label="Open the full Raven editor screenshot"><img src="images/raven-vscode.png" alt="Raven in Visual Studio Code: a Quote union and match expression with a symbol hover tooltip, syntax highlighting, and inferred type hints" width="1152" height="768" loading="lazy"></a>
+    <figcaption>Raven in VS Code, with symbol hover information and compiler-backed type hints.</figcaption>
   </figure>
 </section>
 
