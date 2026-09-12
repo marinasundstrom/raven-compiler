@@ -14,6 +14,9 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-11**.
 
 ### Fixed
 
+- Invalid member calls through `Option` or `Result` conditional access now report
+  diagnostics instead of throwing an invalid-cast exception in the compiler.
+
 - Propagation from inside an exception-protected expression now preserves its
   early return value, including explicit propagation through nested results.
 

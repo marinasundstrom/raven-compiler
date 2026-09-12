@@ -2547,6 +2547,27 @@ partial class BlockBinder
         var payloadLocal = CreateTempLocal("payload", payloadType, syntax);
         var payloadReceiver = new BoundLocalAccess(payloadLocal);
 
+        BoundExpression BindCarrierMemberInvocation(MemberBindingExpressionSyntax memberBinding, InvocationExpressionSyntax invocation)
+        {
+            var member = BindMemberAccessOnReceiver(
+                payloadReceiver, memberBinding.Name,
+                preferMethods: true,
+                allowEventAccess: false,
+                suppressNullWarning: true,
+                receiverTypeForLookup: payloadType,
+                forceExtensionReceiver: true);
+            if (IsErrorExpression(member))
+                return AsErrorExpression(member);
+            if (member is BoundMethodGroupExpression methodGroup)
+                return BindInvocationOnMethodGroup(methodGroup, invocation);
+
+            if (TryGetInvokedMemberName(memberBinding, out var memberName))
+                _diagnostics.ReportNonInvocableMember(memberName, invocation.GetLocation());
+            else
+                _diagnostics.ReportInvalidInvocation(invocation.GetLocation());
+            return ErrorExpression(reason: BoundExpressionReason.NotFound);
+        }
+
         // Bind WhenPresent using payloadReceiver *as the receiver*.
         // (This is different from your current approach, which binds against `receiver`
         // but uses receiverTypeForLookup to *pretend* it’s payload.)
@@ -2563,15 +2584,7 @@ partial class BlockBinder
                     forceExtensionReceiver: true),
 
             InvocationExpressionSyntax { Expression: MemberBindingExpressionSyntax mb } inv =>
-                BindInvocationOnMethodGroup(
-                    (BoundMethodGroupExpression)BindMemberAccessOnReceiver(
-                        payloadReceiver, mb.Name,
-                        preferMethods: true,
-                        allowEventAccess: false,
-                        suppressNullWarning: true,
-                        receiverTypeForLookup: payloadType,
-                        forceExtensionReceiver: true),
-                    inv),
+                BindCarrierMemberInvocation(mb, inv),
 
             ElementBindingExpressionSyntax eb =>
                 BindElementAccessExpression(payloadReceiver, eb.ArgumentList, eb, suppressNullWarning: true),
