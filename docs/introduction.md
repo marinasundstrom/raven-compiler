@@ -1,3 +1,7 @@
+<a id="raven"></a>
+<a id="start-without-ceremony"></a>
+<a id="hello-world"></a>
+
 # A tour of Raven
 
 Raven is a typed language for .NET. If you know C#, you can bring your knowledge
@@ -9,6 +13,11 @@ Each example uses familiar application code as its starting point. The
 [language reference](lang/spec/index.md) covers the complete syntax and rules;
 the [beginner guide](raven-for-absolute-beginners.md) introduces programming
 concepts from the beginning.
+
+<a id="a-quick-taste"></a>
+<a id="target-typed-shorthand"></a>
+<a id="data-shapes-and-patterns"></a>
+<a id="records-and-primary-constructors"></a>
 
 ## Model each outcome with the data it needs
 
@@ -53,6 +62,9 @@ Raven keeps binding explicit so it cannot be confused with a value comparison.
 [Unions and their rules](lang/spec/unions.md) ·
 [Choosing records, classes, and unions](lang/features/data-modeling.md)
 
+<a id="bindings-and-mutability"></a>
+<a id="expressions-and-matching"></a>
+
 ## Let a decision produce a value
 
 Use an `if` block as a value when the branches compute the same result. This
@@ -86,6 +98,10 @@ ordinary mutable .NET collections and objects.
 
 [Expressions and inference](lang/spec/expressions-and-inference.md) ·
 [Bindings and mutability](lang/spec/local-declarations.md)
+
+<a id="result-and-option"></a>
+<a id="propagation-expressions-"></a>
+<a id="railroad-style-flow-with-carrier-methods"></a>
 
 ## Keep expected failure in the function's signature
 
@@ -161,6 +177,9 @@ mode; Raven does not otherwise adopt a general nullable flow engine.
 [Patterns and bindings](lang/spec/fundamental-patterns.md) ·
 [Nullability](lang/nullability.md)
 
+<a id="async-and-await"></a>
+<a id="net-interop"></a>
+
 ## Compose with the .NET APIs you already use
 
 `Task`, `HttpClient`, and `await` still serve their familiar roles. Raven's
@@ -192,6 +211,10 @@ to handle them in that form.
 [Async functions](lang/spec/async-functions.md) ·
 [Exceptions and capture](lang/spec/error-handling.md)
 
+<a id="functions"></a>
+<a id="extensions"></a>
+<a id="accessibility-defaults"></a>
+
 ## Keep objects, functions, and libraries together
 
 Classes and interfaces remain first-class modeling tools for identity, state,
@@ -204,6 +227,8 @@ types. Familiarity does not mean every source rule is identical: for example,
 Raven uses `()` for `unit` rather than `void`, and ordinary classes are closed
 to inheritance unless declared `open` or `abstract`. The reference explains
 these differences where they affect the code you write.
+
+<a id="where-to-go-next"></a>
 
 ## Continue with a real program
 

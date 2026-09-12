@@ -37,6 +37,15 @@ assert_contains "$site_root/playground/appsettings.json" '"RavenSiteRootHref": "
 assert_contains "$repository_root/samples/projects/macro-html-blazor/wasm/wwwroot/appsettings.json" '"RavenSiteRootHref": "./"'
 assert_contains "$site_root/experiments/html-macro/appsettings.json" '"RavenSiteRootHref": "../../"'
 
+# Preserve incoming links to the original language tour after its editorial rewrite.
+for anchor in raven start-without-ceremony hello-world a-quick-taste \
+    target-typed-shorthand bindings-and-mutability expressions-and-matching \
+    result-and-option propagation-expressions- railroad-style-flow-with-carrier-methods \
+    functions data-shapes-and-patterns extensions records-and-primary-constructors \
+    accessibility-defaults async-and-await net-interop where-to-go-next; do
+    assert_contains "$site_root/introduction.html" "id=\"$anchor\""
+done
+
 # Every independently rendered surface receives the same generated provenance
 # script from the combined Pages artifact.
 assert_contains "$site_root/index.html" 'data-raven-site-provenance src="./site-build.js"'
