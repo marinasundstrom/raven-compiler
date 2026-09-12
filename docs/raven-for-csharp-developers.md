@@ -1,174 +1,98 @@
 # Raven for C# developers
 
-Raven runs on .NET and uses the .NET type system and libraries, but it does not
-require C#'s usual source structure. Learning Raven is partly a process of
-separating useful object-oriented modeling from habits that exist because C#
-traditionally requires code to live inside types.
+Bring your knowledge of .NET types, generics, libraries, asynchronous APIs,
+and object-oriented design. Raven uses those same foundations. This guide
+concentrates on the source rules and modeling choices that affect how you
+write Raven code.
 
-The Raven question is not “how do I rewrite this C# syntax?” It is “what does
-this code represent, and what is the most direct Raven shape for it?”
+For a runnable first look, start with the [language tour](introduction.md).
+Use the [language reference](lang/spec/index.md) for the complete rules.
+These examples target Raven 0.1.12; see [release compatibility](status.md).
 
-This guide presents starting points, not mechanical rewrite rules. Raven fully
-supports classes, interfaces, methods, properties, and mutable objects when they
-fit the problem.
+<a id="gradually-adopt-idiomatic-raven"></a>
+<a id="a-quick-translation-table"></a>
 
-## Gradually adopt idiomatic Raven
+## What carries over, and what changes
 
-This guide is an introduction for C# developers. Familiar C#
-structures—classes, interfaces, methods, loops, mutable objects, nullable
-values, exceptions, and ordinary .NET APIs—can be expressed directly in Raven,
-so you can begin with a close translation.
+| Area | Familiar foundation | Raven choice to notice |
+| --- | --- | --- |
+| Application structure | Top-level statements are available in both languages | Functions can also be declared directly in a namespace |
+| Objects and data | Classes, interfaces, structs, records, generics, and mutable objects | Ordinary classes require `open` or `abstract` to permit inheritance |
+| Locals | Type inference and reassignment | `let` prevents reassignment; `var` permits it |
+| Decisions | Conditions and structural patterns | Blocks and `if` expressions can produce values; the final expression can supply the function result |
+| Absence and failure | Nullable types and exception handling | `Option<T>`, `Result<T, E>`, and postfix `?` make absence and expected failure explicit |
+| Framework calls | The same .NET libraries and CLR methods | Selected APIs have Raven projections, such as `TryParse` returning `Option` |
+| Patterns | Constants, comparisons, destructuring, and guards | `let` introduces a capture; `== existingValue` compares with an existing variable |
+| Async and resources | `Task`, `await`, and disposal | `use` scopes disposal; `try expression` captures exceptions as a result |
 
-As you become comfortable with the language, introduce idiomatic Raven
-features—records, unions, patterns, functions, `Option`, and `Result`—where they
-make the code clearer. For more in-depth rationale and design guidance, read
-[Meaning of Raven features](lang/feature-meaning.md) and [Domain modeling in
-Raven](lang/domain-modeling.md).
-
-## A quick translation table
-
-| Common C# starting point | Raven starting point |
-| --- | --- |
-| `Program.Main` | Top-level statements or a plain `Main` function |
-| Static utility class | Top-level or namespace-level functions |
-| One-method service interface | Function parameter |
-| DTO class | Record class or record struct |
-| Primitive used for a domain concept | Record wrapper with validation |
-| `null` for domain absence | `Option<T>` |
-| Exception for an expected outcome | `Result<T, E>` |
-| Enum plus associated nullable fields | Union with case payloads |
-| `switch` plus type and null checks | Structural `match` |
-| Mutable local by default | `let`, with `var` when mutation is intentional |
-| Object hierarchy for a closed set of variants | Union |
-| Class with identity or resource lifecycle | Class |
-| Open implementation boundary | Interface, class, or struct implementation |
+Records, pattern matching, function-valued dependencies, and top-level code
+are useful in C# too. Choose them for what they model. Their presence alone
+is not a reason to redesign a working application when moving to Raven.
 
 ## Entry points do not require a `Program` class
 
-A traditional C# application puts its entry point on a type:
+As with C# top-level statements, a small Raven program can start directly:
 
-```csharp
-public static class Program
-{
-    public static void Main()
-    {
-        Console.WriteLine("Hello");
-    }
-}
-```
-
-A small Raven application can consist of top-level statements:
+<div data-raven-playground="source"></div>
 
 ```raven
 import System.Console.*
 
-WriteLine("Hello")
+WriteLine("Hello from Raven")
 ```
 
-When a named entry point is useful, declare a plain function:
-
-```raven
-import System.Console.*
-
-func Main() -> () {
-    WriteLine("Hello")
-}
-```
-
-Create an application class only if the application itself has meaningful state
-or behavior to encapsulate—not because the runtime entry point needs a home.
+A named entry point can be a plain `func Main() -> ()`. The `()` return type
+is Raven's `unit`: an operation with no meaningful result.
 
 ## Utility classes become plain functions
 
-C# frequently uses static classes as namespaces for behavior:
+A reusable operation can live in a namespace without a static utility class.
+Put behavior on a type when it needs that type's state or encapsulation.
 
-```csharp
-public static class CarrierNames
-{
-    public static string Normalize(string name) =>
-        name.Trim().ToUpperInvariant();
-}
-```
-
-The Raven version names the operation directly:
+<div data-raven-playground="source"></div>
 
 ```raven
-func NormalizeCarrier(name: string) -> string {
-    return name.Trim().ToUpperInvariant()
+import System.Console.*
+
+func normalizeCarrier(name: string) -> string {
+    name.Trim().ToUpperInvariant()
 }
+
+WriteLine(normalizeCarrier("  raven express  "))
 ```
 
-Parsing, validation, formatting, calculations, and workflow orchestration are
-good candidates for plain functions. Put behavior on a class or record when it
-belongs to that type's vocabulary or needs its encapsulated state.
+The final expression supplies the result. An explicit `return` is also valid.
+See [functions](lang/spec/functions.md) for declarations and function types.
 
 ## Inject one operation as one function
 
-A C# dependency is often represented by an interface even when it contains one
-operation:
-
-```csharp
-public interface ITemperatureReader
-{
-    Task<decimal> ReadAsync();
-}
-
-public sealed class Monitor(ITemperatureReader reader)
-{
-    public async Task<bool> IsTooHot(decimal limit) =>
-        await reader.ReadAsync() > limit;
-}
-```
-
-In Raven, a function type can describe that capability directly:
+Both languages support passing behavior as a value. Raven spells a function
+type directly, for example `() -> Task<decimal>`:
 
 ```raven
 import System.Threading.Tasks.*
 
-async func IsTooHot(read: () -> Task<decimal>, limit: decimal) -> Task<bool> {
+async func isTooHot(read: () -> Task<decimal>, limit: decimal) -> Task<bool> {
     let temperature = await read()
     return temperature > limit
 }
 ```
 
-Production code can pass a device-reading function and tests can pass a
-deterministic function. Use an interface when the dependency is genuinely an
-open protocol with several related operations or implementations. Use a class
-when it owns state, disposal, or a resource lifecycle.
+Use a function parameter for a single operation. An interface is useful for a
+contract with related operations; a class can own state and resources.
 
 ## DTOs become explicit data shapes
 
-A record expresses immutable domain data without a handwritten property and
-constructor shell:
-
-```csharp
-public sealed record ShipmentRequest(
-    string Id,
-    string Carrier,
-    int WeightKg);
-```
-
-```raven
-record class ShipmentRequest(
-    val Id: string,
-    val Carrier: string,
-    val WeightKg: int)
-```
-
-Choose a record struct for value semantics and a record class for reference
-semantics. Choose an ordinary class when identity or encapsulated mutable state
-matters more than structural value behavior.
+Records provide structural equality in both languages. Raven supports record
+classes and record structs. Reference versus value representation and
+structural equality are separate choices; a record class still has structural
+equality. A record also does not make every referenced object deeply immutable.
 
 ## Domain primitives become domain types
 
-C# applications often pass primitive values whose meaning exists only in names
-and conventions:
-
-```csharp
-static Result Register(int year) { /* ... */ }
-```
-
-Raven can give the value its own identity and keep validation at its boundary:
+A validated domain value can be represented by an ordinary record with a
+restricted constructor. This design is useful in either language. Raven's
+`Result` and case shorthand make the possible outcomes explicit:
 
 ```raven
 union YearError {
@@ -178,253 +102,143 @@ union YearError {
 record struct Year private (Value: int) {
     static func Create(value: int) -> Result<Year, YearError> {
         if value < 1 {
-            return Error(.OutOfRange(value))
+            return .Error(.OutOfRange(value))
         }
-
-        return Ok(Year(value))
+        return .Ok(Year(value))
     }
 }
 ```
 
-This is an ordinary record with a restricted constructor, not special compiler
-support for opaque aliases. A `Year` cannot be confused with every other `int`.
+See [data modeling](lang/features/data-modeling.md) for the choice between
+records, ordinary classes, and unions.
 
 ## Absence becomes `Option`
 
-Raven also projects a curated set of familiar .NET APIs into this model. The
-underlying framework types remain the same, but their Raven-facing signatures
-express absence and expected failure directly:
+Use `Option<T>` when absence is part of the domain contract. Nullable types
+remain available for APIs that use null. `None` and `Some(null)` describe
+different states when the payload type itself permits null.
+
+<div data-raven-playground="source"></div>
 
 ```raven
-import System.*
-import System.Collections.Generic.*
+import System.Console.*
 
-let count = int.TryParse(text)          // Option<int>
-let item = values.TryGetValue(key)      // Option<TValue>
-let id = Guid.Parse(text)               // Result<Guid, FormatException>
-```
-
-These are compiler-validated projections backed by Raven.Core bridges, not a
-rule that rewrites every method named `Try*`. Each supported framework method
-has an exact, versioned mapping. Projections are enabled by default; set
-`RavenFrameworkProjections` to `None` in the project file when code needs the
-ordinary CLR methods and their `out` parameters.
-
-The channels retain distinct meanings. `None` means a lookup did not produce a
-value. If the collection's declared value type is nullable, `Some(null)` is
-still different from `None`. `Result.Error` contains failures expected under a
-well-typed call. An exception reachable only by forcing `null` through a
-non-null parameter remains a fault and propagates normally.
-
-Nullable references commonly make absence implicit in C#:
-
-```csharp
-Customer? FindCustomer(string id);
-```
-
-Raven domain APIs prefer to state absence in the return type:
-
-```raven
-func FindCustomer(id: string) -> Option<Customer> {
-    // ...
-    return None
+let message = int.TryParse("8080") match {
+    .Some(let port) => "Port: $port"
+    .None => "No port supplied"
 }
+
+WriteLine(message)
 ```
 
-Handle the alternatives with a match:
+This call demonstrates a Raven-specific framework projection: the selected
+`TryParse` overload returns `Option<int>` without an `out` variable. Projections
+use explicit mappings backed by Raven.Core; they do not rewrite every method
+whose name starts with `Try`. Set `RavenFrameworkProjections` to `None` in the
+project file to use the ordinary CLR signatures instead.
 
-```raven
-let message = FindCustomer("C-100") match {
-    Some(let customer) => "Found ${customer.Name}"
-    None => "Customer not found"
-}
-```
-
-Raven still supports nullable values for .NET interop. `Option<T>` is the
-preferred domain shape when absence is expected and meaningful.
-
-Unlike C#, Raven applies the same declared nullable model to reference and
-value types. A `T?` value cannot be dereferenced until an explicit operation
-produces `T`. Prefer a pattern binding when crossing that boundary:
-
-```raven
-if let customer: Customer = importedCustomer {
-    WriteLine(customer.Name)
-}
-```
-
-`if importedCustomer is not null` is also a valid condition, but it does not
-change the original storage from `Customer?` to `Customer`. This avoids a
-contextual compiler promise for mutable values and properties. See
-[Nullability and absence](lang/nullability.md).
+Raven's nullable checking also differs from C#. By default, use a pattern to
+obtain a non-null binding. With `<EnableIsNotNullNarrowing>true</EnableIsNotNullNarrowing>`,
+a direct `is not null` check can narrow a stable local or parameter inside its
+true branch. It does not provide general flow analysis for arbitrary properties.
+Postfix `!` suppresses nullability for one expression and reports `RAV0403`.
+For references it adds no runtime check; for nullable value types it extracts
+the underlying value and throws if no value is present.
+See [nullability](lang/nullability.md) for the exact boundary rules.
 
 ## Expected failure becomes `Result`
 
-Exceptions are useful for unexpected faults. They are less useful when callers
-are expected to branch on validation or lookup outcomes.
+`Result<T, E>` puts expected failure in the return type. Postfix `?` extracts
+the successful payload or returns the failure from the enclosing function.
+The enclosing return type must support that propagation.
 
-```csharp
-static Quote BuildQuote(string id)
-{
-    var request = FindRequest(id)
-        ?? throw new RequestNotFoundException(id);
-    return CalculateQuote(request);
-}
-```
-
-A Raven API can expose the expected failure:
+<div data-raven-playground="source"></div>
 
 ```raven
-union QuoteError {
-    case RequestNotFound(id: string)
-    case InvalidWeight(weight: int)
-}
+import System.Console.*
 
-func BuildQuote(id: string) -> Result<Quote, QuoteError> {
-    let request = FindRequest(id)
-        .OkOr(() => .RequestNotFound(id))?
-
-    if request.WeightKg < 1 {
-        return Error(.InvalidWeight(request.WeightKg))
+func parsePort(text: string) -> Result<int, string> {
+    int.Parse(text) match {
+        .Ok(let port) when port > 0 && port <= 65535 => .Ok(port)
+        .Ok(_) => .Error("Port must be between 1 and 65535")
+        .Error(_) => .Error("Port must be a number")
     }
-
-    return Ok(CalculateQuote(request))
 }
+
+func endpoint(text: string) -> Result<string, string> {
+    let port = parsePort(text)?
+    return .Ok("http://localhost:$port")
+}
+
+WriteLine(endpoint("8080"))
+WriteLine(endpoint("invalid"))
 ```
 
-The `?` expression keeps the successful path linear while preserving the typed
-failure in the function signature. Use `match` when recovery deserves to be
-shown explicitly.
+`int.Parse` is another selected framework projection. For other throwing calls,
+`try expression` captures an exception as a result. `(try expression)?` composes
+capture with propagation; each `?` handles one carrier layer.
+Ordinary `try`/`catch` remains available.
 
 ## State plus payload becomes a union
 
-C# models sometimes combine an enum with fields that are valid only for some
-states:
+A union associates each alternative with the data it needs. Use an enum for
+named constants, a union for alternatives with payloads, and an open class or
+interface when external implementations should extend the model.
 
-```csharp
-public enum DeliveryStatus { Pending, Delivered, Failed }
-
-public sealed record Delivery(
-    DeliveryStatus Status,
-    DateTime? DeliveredAt,
-    string? FailureReason);
-```
-
-A Raven union puts the data on the case where it is valid:
-
-```raven
-import System.*
-
-union DeliveryStatus {
-    case Pending
-    case Delivered(at: DateTime)
-    case Failed(reason: string)
-}
-```
-
-```raven
-func Describe(status: DeliveryStatus) -> string {
-    return status match {
-        .Pending => "Pending"
-        .Delivered(let at) => "Delivered at $at"
-        .Failed(let reason) => "Failed: $reason"
-    }
-}
-```
-
-Use an enum when cases are only named constants. Use a union for a closed family
-of cases with different payloads. Use an interface or class hierarchy when the
-family must remain open to new third-party implementations.
+Raven targets .NET 11's union and closed-hierarchy contracts and also supports
+.NET 10 through Raven.Core compatibility metadata. One difference is intentional:
+Raven supports closed interfaces, while C# 15 / .NET 11 RC 1 does not. A C# caller
+can consume such an interface as an ordinary interface, but cannot rely on C#
+recognizing the same closed family for exhaustive analysis. See
+[closed hierarchies and interoperability](lang/spec/inheritance-and-partial-types.md)
+and [unions](lang/spec/unions.md) for the supported shapes and limitations.
 
 ## Immutability is the visible default
 
-C# locals are mutable unless the programmer arranges otherwise:
-
-```csharp
-var total = subtotal + tax;
-total -= discount;
-```
-
-Raven distinguishes the intent at the declaration:
-
-```raven
-let subtotal = 1000
-let tax = 250
-var total = subtotal + tax
-total = total - discount
-```
-
-Use `let` for a lexical binding that does not change and `var` when mutation is part of
-the algorithm. Mutable objects and fields remain available when stateful
-modeling is appropriate.
+`let` prevents reassignment of a local binding; `var` allows it. Neither makes
+a referenced list, dictionary, or object deeply immutable. Use mutation when
+it expresses the operation clearly, and choose the binding keyword accordingly.
 
 ## Pattern matching replaces scattered inspection
 
-Raven patterns work across unions, options, results, records, tuples, and other
-structural shapes. Code that would distribute null, type, and status checks
-across several C# branches can often become one visible decision:
+As in C#, patterns can combine structural inspection with guards. In Raven,
+introducing a capture is explicit even when its type can be inferred:
+
+<div data-raven-playground="source"></div>
 
 ```raven
-union CustomerError {
-    case NotFound(id: string)
-    case Unavailable
-}
+import System.Console.*
 
-func Message(result: Result<Customer, CustomerError>) -> string {
-    return result match {
-        Ok(let customer) => "Welcome ${customer.Name}"
-        Error(.NotFound(let id)) => "No customer named $id"
-        Error(.Unavailable) => "Customer service unavailable"
+func describePort(port: int, preferred: int) -> string {
+    port match {
+        == preferred => "Preferred port"
+        let other => "Alternative: $other"
     }
 }
+
+WriteLine(describePort(8080, 8080))
+WriteLine(describePort(9000, 8080))
 ```
 
-The point is not merely a shorter `switch`. The data model and the decision use
-the same case vocabulary, so invalid combinations are harder to represent.
+`== preferred` uses ordinary equality semantics. `let other` declares a new
+binding. Constants can appear directly; an existing variable needs an explicit
+comparison. See [patterns](lang/spec/fundamental-patterns.md).
 
 ## Classes are still the Raven way when the domain has objects
 
-Do not translate every C# class into a collection of functions. A stateful
-connection, aggregate with identity, actor, cache, UI component, or resource
-owner can still be most honestly represented by a class:
-
-```raven
-class GreenhouseDevice private (val DeviceId: string) {
-    static func Connect(deviceId: string) -> Result<GreenhouseDevice, string> {
-        return Ok(GreenhouseDevice(deviceId))
-    }
-
-    func ReadTemperature() -> Result<decimal, string> {
-        // Read from the connected device.
-        return Ok(21.5)
-    }
-}
-```
-
-The Raven difference is that the class has a reason to exist: it represents a
-device with identity and a connection boundary. Domain calculations around its
-readings can remain plain functions, and those functions can be injected back
-into object-oriented components when useful.
+Classes remain appropriate for identity, state, lifetimes, and encapsulation.
+Ordinary classes are closed to inheritance by default; mark an extensible base
+class `open` or `abstract`. A `closed` hierarchy describes a known family of
+subtypes, which is a different modeling decision from allowing no subclasses.
 
 ## A practical decision sequence
 
-When translating a design from C#, ask:
+Start with the shape the application needs: a function for an operation, a record
+for structural data, a union for alternatives, or a class for identity and state.
+Use `Option` and `Result` when absence and failure belong in the public contract.
+These choices can coexist with ASP.NET Core, LINQ, NuGet libraries, and existing
+C# assemblies.
 
-1. Is this just an operation? Start with a function.
-2. Is this one required capability? Consider a function parameter.
-3. Is this immutable data or a domain value? Consider a record.
-4. Is this a closed set of meaningful alternatives? Consider a union.
-5. Is absence or failure expected? Use `Option` or `Result`.
-6. Does this concept have identity, state, lifecycle, or encapsulation? Use a
-   class.
-7. Must unrelated implementations participate in an open contract? Use an
-   interface.
-
-This is the main adjustment when moving from C#: classes remain available, but
-they stop being the mandatory starting point.
-
-For more examples, continue with [Domain modeling in
-Raven](lang/domain-modeling.md) and the [language
-introduction](introduction.md). Use the [language
-reference](lang/spec/index.md) to look up precise syntax, type-system, and .NET
-interoperability rules.
+Continue with [the language tour](introduction.md),
+[domain modeling](lang/domain-modeling.md), or the
+[language reference](lang/spec/index.md).
