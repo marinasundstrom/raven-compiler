@@ -14,6 +14,8 @@ Behavior-focused timeline covering **2025-09-12** to **2026-09-11**.
 
 ### Fixed
 
+- Compound match guards preserve short-circuit evaluation and no longer emit invalid programs.
+
 - Invalid member calls through `Option` or `Result` conditional access now report
   diagnostics instead of throwing an invalid-cast exception in the compiler.
 

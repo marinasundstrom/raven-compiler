@@ -126,6 +126,37 @@ func Main() {
         AssertOutput(source, ["1", "2", "3", "1"]);
     }
 
+    [Theory]
+    [InlineData(OptimizationLevel.Debug)]
+    [InlineData(OptimizationLevel.Release)]
+    public void CompoundMatchGuards_EvaluateOnceAndShortCircuit(OptimizationLevel optimizationLevel)
+    {
+        const string source = """
+import System.*
+
+func Observe(value: bool) -> bool {
+    Console.WriteLine(value)
+    return value
+}
+
+func Check(value: int) -> string {
+    value match {
+        let n when Observe(n > 0) && Observe(n < 10) => "in range"
+        let n when Observe(n == 0) || Observe(n == 10) => "boundary"
+        _ => "outside"
+    }
+}
+
+Console.WriteLine(Check(5))
+Console.WriteLine(Check(0))
+Console.WriteLine(Check(11))
+""";
+
+        AssertOutput(source,
+            ["True", "True", "in range", "False", "True", "boundary",
+             "True", "False", "False", "False", "outside"], optimizationLevel);
+    }
+
     private static void AssertOutput(
         string source,
         string[] expected,

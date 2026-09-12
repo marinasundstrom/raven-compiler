@@ -8755,56 +8755,10 @@ internal partial class ExpressionGenerator : Generator
 
         if (expression is BoundBinaryExpression binaryExpression)
         {
-            if ((binaryExpression.Operator.OperatorKind & (BinaryOperatorKind.Lifted | BinaryOperatorKind.Checked)) != 0)
-            {
-                EmitExpression(binaryExpression);
-                ILGenerator.Emit(OpCodes.Brfalse, end);
-                return;
-            }
-
-            EmitExpression(binaryExpression.Left);
-            EmitExpression(binaryExpression.Right);
-
-            var operatorKind = binaryExpression.Operator.OperatorKind & ~(BinaryOperatorKind.Lifted | BinaryOperatorKind.Checked);
-            switch (operatorKind)
-            {
-                case BinaryOperatorKind.Equality:
-                    ILGenerator.Emit(OpCodes.Ceq); // compare
-                    ILGenerator.Emit(OpCodes.Brfalse, end);
-                    break;
-
-                case BinaryOperatorKind.Inequality:
-                    ILGenerator.Emit(OpCodes.Ceq);
-                    ILGenerator.Emit(OpCodes.Ldc_I4_0);
-                    ILGenerator.Emit(OpCodes.Ceq); // logical NOT
-                    ILGenerator.Emit(OpCodes.Brfalse, end);
-                    break;
-
-                case BinaryOperatorKind.GreaterThan:
-                    ILGenerator.Emit(OpCodes.Cgt);
-                    ILGenerator.Emit(OpCodes.Brfalse, end);
-                    break;
-
-                case BinaryOperatorKind.LessThan:
-                    ILGenerator.Emit(OpCodes.Clt);
-                    ILGenerator.Emit(OpCodes.Brfalse, end);
-                    break;
-
-                case BinaryOperatorKind.GreaterThanOrEqual:
-                    ILGenerator.Emit(OpCodes.Clt);
-                    ILGenerator.Emit(OpCodes.Brtrue, end);
-                    break;
-
-                case BinaryOperatorKind.LessThanOrEqual:
-                    ILGenerator.Emit(OpCodes.Cgt);
-                    ILGenerator.Emit(OpCodes.Brtrue, end);
-                    break;
-
-                default:
-                    EmitExpression(binaryExpression);
-                    ILGenerator.Emit(OpCodes.Brfalse, end);
-                    break;
-            }
+            // Use ordinary expression emission so short-circuiting and operator
+            // semantics stay identical in conditions and value expressions.
+            EmitExpression(binaryExpression);
+            ILGenerator.Emit(OpCodes.Brfalse, end);
         }
         else if (expression is BoundLiteralExpression literalExpression)
         {
