@@ -690,6 +690,9 @@ body:has(.raven-hero) article {
 .raven-tool-grid > div { padding-top: 1rem; border-top: 2px solid var(--raven-accent); }
 .raven-tool-grid h3 { font-size: 1.3rem; }
 .raven-tool-grid p { color: var(--raven-muted); }
+.raven-editor-figure { margin: 2.5rem 0 0; }
+.raven-editor-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--raven-line); border-radius: .8rem; }
+.raven-editor-figure figcaption { margin-top: .75rem; color: var(--raven-muted); font-size: .95rem; }
 body:not(:has(.raven-hero)) article { max-width: 72ch; }
 body > main > .content > .raven-doc-navigation { display: block; padding: 1rem 0; border-bottom: 1px solid var(--raven-line); margin-bottom: 1.5rem; }
 .raven-doc-navigation summary { font-weight: 700; cursor: pointer; }
