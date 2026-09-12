@@ -228,8 +228,9 @@ comparison. See [patterns](lang/spec/fundamental-patterns.md).
 
 Classes remain appropriate for identity, state, lifetimes, and encapsulation.
 Ordinary classes are closed to inheritance by default; mark an extensible base
-class `open` or `abstract`. A `closed` hierarchy describes a known family of
-subtypes, which is a different modeling decision from allowing no subclasses.
+class `open` or `abstract`. Raven uses `sealed` for a closed family of subtypes,
+with an optional `permits` list. This differs from C#'s `sealed`, which prevents
+subclassing altogether.
 
 ## A practical decision sequence
 
